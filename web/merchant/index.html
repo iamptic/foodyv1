@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Foody — Личный кабинет ресторана</title>
+  <script src="/config.js"></script>
+  <style>
+    :root{
+      --bg:#0b0c10; --card:#12141a; --mut:#8b90a2; --pri:#7bd88f; --err:#ff6b6b; --br:#22252f;
+    }
+    *{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,#0b0c10,#10131a 60%);color:#eef1f5;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
+    .wrap{max-width:1000px;margin:0 auto;padding:16px 16px 48px}
+    h1{font-size:22px;margin:8px 0 14px} h3{margin:4px 0 10px}
+    .grid{display:grid;gap:12px}
+    .g2{grid-template-columns:1fr 1fr} .g3{grid-template-columns:1fr 1fr 1fr}
+    .card{background:var(--card);border:1px solid var(--br);border-radius:16px;padding:14px}
+    label{display:block;margin:6px 0 6px 2px;color:#cbd1de;font-size:12px}
+    input,textarea,select{width:100%;padding:12px 12px;border:1px solid var(--br);border-radius:12px;background:#0e1117;color:#eef1f5;outline:none}
+    textarea{min-height:80px;resize:vertical}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .btn{padding:10px 12px;border-radius:12px;border:1px solid var(--br);background:#131723;color:#eef1f5;cursor:pointer}
+    .btn.primary{background:var(--pri);color:#08120b;border-color:#57c874}
+    .btn.secondary{background:#191d2a}
+    .btn.ghost{background:transparent;border-color:#2b3042;color:#b9bfd0}
+    .mut{color:var(--mut)} .ok{color:var(--pri)} .err{color:var(--err)}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid #2a3040;background:#111522;color:#cdd3e2;font-size:12px}
+    .price s{color:#9aa1b3}
+    .toast{position:fixed;right:12px;bottom:12px;background:#090c12;border:1px solid #2b3042;color:#eef1f5;padding:10px 12px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+    .tbl{width:100%;border-collapse:collapse} .tbl th,.tbl td{border-bottom:1px solid #232838;padding:10px 8px}
+    .tbl th{color:#9aa1b3;font-weight:600;text-transform:uppercase;font-size:12px;letter-spacing:.3px}
+    .split{display:grid;grid-template-columns:1.2fr .8fr;gap:12px}
+    @media(max-width:860px){.g2,.g3,.split{grid-template-columns:1fr}}
+    .kbd{font:12px/1.8 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;border:1px solid #2b3042;background:#0d111a;color:#cdd3e2;padding:0 6px;border-radius:6px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🍽 Foody — Личный кабинет</h1>
+
+  <div class="split">
+    <div class="grid">
+      <div class="card">
+        <h3>Подключение</h3>
+        <div class="grid g2">
+          <div>
+            <label>Адрес API</label>
+            <input id="api" placeholder="https://backend-....up.railway.app">
+            <div class="mut" style="margin-top:6px">Сохраняется локально. Если конфиг не подхватился — укажи вручную.</div>
+          </div>
+          <div class="row" style="align-items:end">
+            <button class="btn" id="btnSaveApi">Сохранить API</button>
+            <button class="btn" id="btnProbe">Проверить</button>
+            <button class="btn ghost" id="btnClear">Сбросить ЛК</button>
+          </div>
+        </div>
+        <pre id="log" class="mut" style="max-height:140px;overflow:auto;background:#0c1018;border:1px dashed #2b3042;padding:8px;border-radius:12px;margin-top:8px"></pre>
+      </div>
+
+      <div class="card" id="cardRegister">
+        <h3>Регистрация ресторана</h3>
+        <div class="grid g2">
+          <div>
+            <label>Название</label>
+            <input id="name" placeholder="Пекарня №1">
+          </div>
+          <div>
+            <label>Телефон (необязательно)</label>
+            <input id="phone" placeholder="+7...">
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn primary" id="btnRegister">Сохранить</button>
+          <span class="mut">RID и ключ сохранятся локально</span>
+        </div>
+      </div>
+
+      <div class="card" id="cardOffer" style="display:none">
+        <h3>Новый оффер</h3>
+        <div class="grid g2">
+          <div><label>Название</label><input id="title" placeholder="Суп-пюре дня"></div>
+          <div><label>Количество</label><input id="qty" value="5"></div>
+        </div>
+        <label>Описание</label><textarea id="descr" placeholder="Коротко..."></textarea>
+        <div class="grid g3">
+          <div><label>Цена, ₽</label><input id="price" placeholder="199,00"></div>
+          <div><label>Обычная цена, ₽</label><input id="original_price" placeholder="349,00"></div>
+          <div><label>Действительно до</label><input id="expires" type="datetime-local"></div>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <span class="pill">Быстрые</span>
+          <button class="btn" id="btnPreset30">−30%</button>
+          <button class="btn" id="btnPreset50">−50%</button>
+          <button class="btn" id="btnPreset70">−70%</button>
+          <span class="pill">Время</span>
+          <button class="btn" id="btnPlus1h">+1 час</button>
+          <button class="btn" id="btnPlus2h">+2 часа</button>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn primary" id="btnCreateOffer">Создать оффер</button>
+        </div>
+      </div>
+
+      <div class="card" id="cardGrid" style="display:none">
+        <h3>Мои офферы</h3>
+        <table class="tbl" id="offersTbl">
+          <thead><tr><th>Название</th><th>Цена</th><th>До</th><th>Остаток</th><th></th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="row" style="margin-top:8px">
+          <button class="btn" id="btnExport">Экспорт CSV</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card" id="cardProfile" style="display:none">
+        <h3>Профиль</h3>
+        <label>RID</label><input id="rid" readonly>
+        <label>Название</label><input id="prof_title">
+        <label>Телефон</label><input id="prof_phone">
+        <div class="row" style="margin-top:8px">
+          <button class="btn primary" id="btnSaveProfile">Сохранить профиль</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Подсказки</h3>
+        <div class="mut">
+          <div>• <span class="kbd">Ctrl/Cmd + R</span> — сбросить кэш ЛК</div>
+          <div>• Скидки по кнопкам считают от «Обычной цены»</div>
+          <div>• Если API не откликается — нажми «Проверить» и пришли мне лог ниже</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // --- Utils
+  const $ = id => document.getElementById(id);
+  const toast = t => { const d=document.createElement('div'); d.className='toast'; d.textContent=t; document.body.appendChild(d); setTimeout(()=>d.remove(),2500); };
+  const pad = n => String(n).padStart(2,'0');
+  const asISO = v => v ? new Date(v).toISOString() : null;
+  const fmtLocalInput = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const rub = n => (n/100).toFixed(2).replace('.',',');
+  const numCents = inp => Math.round(parseFloat((inp.value||'0').replace(',','.'))*100)||0;
+  const log = t => { const el=$('log'); el.textContent = (t||'')+"\n"+el.textContent; };
+
+  // --- API resolve
+  function resolveApi(){
+    const c = (window.foodyApi||'').trim();
+    const ls = (localStorage.getItem('foody_api')||'').trim();
+    const fb = location.origin.replace(/\/web$/, '');
+    return c || ls || fb;
+  }
+  function API(){ return resolveApi() }
+  function setApi(v){ localStorage.setItem('foody_api', (v||'').trim()); $('api').value=(v||'').trim(); }
+
+  // --- State
+  const RID = () => { try{ return (JSON.parse(localStorage.getItem('foody_restaurant')||'{}').id)||'' }catch(_){ return '' } };
+  const KEY = () => localStorage.getItem('foody_key')||'';
+
+  // --- UI wiring
+  document.addEventListener('DOMContentLoaded', ()=>{
+    $('api').value = resolveApi();
+    $('btnSaveApi').onclick = ()=>{ setApi($('api').value); toast('API сохранён') };
+    $('btnProbe').onclick = async ()=>{
+      try{ const r = await fetch(API()+'/health',{cache:'no-store'}); log('GET /health → '+r.status+' '+(r.ok?'OK':'ERR')); }
+      catch(e){ log('Ошибка запроса: '+e) }
+    };
+    $('btnClear').onclick = ()=>{ localStorage.removeItem('foody_restaurant'); localStorage.removeItem('foody_key'); location.reload() };
+
+    $('btnRegister').onclick = registerRestaurant;
+    $('btnSaveProfile').onclick = saveProfile;
+    $('btnCreateOffer').onclick = createOffer;
+    $('btnExport').onclick = exportCSV;
+
+    $('btnPreset30').onclick = ()=>{ const p=numCents($('original_price')); if(p>0) $('price').value=(p*0.7/100).toFixed(2).replace('.',',') };
+    $('btnPreset50').onclick = ()=>{ const p=numCents($('original_price')); if(p>0) $('price').value=(p*0.5/100).toFixed(2).replace('.',',') };
+    $('btnPreset70').onclick = ()=>{ const p=numCents($('original_price')); if(p>0) $('price').value=(p*0.3/100).toFixed(2).replace('.',',') };
+
+    $('btnPlus1h').onclick = ()=>{ const d=$('expires').value?new Date($('expires').value):new Date(); d.setHours(d.getHours()+1); $('expires').value=fmtLocalInput(d) };
+    $('btnPlus2h').onclick = ()=>{ const d=$('expires').value?new Date($('expires').value):new Date(); d.setHours(d.getHours()+2); $('expires').value=fmtLocalInput(d) };
+
+    // default expires +2h
+    const d=new Date(); d.setHours(d.getHours()+2); $('expires').value = fmtLocalInput(d);
+
+    if(RID()){ enterLK(); }
+    document.addEventListener('keydown', (e)=>{
+      if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='r'){ e.preventDefault(); localStorage.removeItem('foody_restaurant'); localStorage.removeItem('foody_key'); location.reload(); }
+    });
+  });
+
+  function enterLK(){
+    $('cardRegister').style.display='none';
+    $('cardOffer').style.display='block';
+    $('cardGrid').style.display='block';
+    $('cardProfile').style.display='block';
+    $('rid').value = RID();
+    loadProfile(); loadOffers();
+  }
+
+  // --- Actions
+  async function registerRestaurant(){
+    const name=($('name').value||'').trim();
+    const phone=($('phone').value||'').trim();
+    if(!name){ toast('Введите название'); return }
+    for(let i=0;i<2;i++){ try{ await fetch(API()+'/health',{cache:'no-store'}) }catch(_){} }
+    try{
+      let r = await fetch(API()+'/api/v1/merchant/register_public', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({title:name, phone})
+      });
+      if(!r.ok){
+        const t=await r.text().catch(()=>'');
+        log('register_public (json): '+r.status+' '+t);
+        if(r.status===415 || r.status===422 || r.status===400){
+          r = await fetch(API()+'/api/v1/merchant/register_public', {
+            method:'POST',
+            headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({title:name, phone})
+          });
+        }
+      }
+      if(!r.ok){ const t=await r.text().catch(()=> ''); log('register_public: '+r.status+' '+t); toast('Ошибка регистрации'); return }
+      const data = await r.json();
+      localStorage.setItem('foody_restaurant', JSON.stringify({id:data.restaurant_id, title:name, phone}));
+      localStorage.setItem('foody_key', data.api_key);
+      enterLK(); toast('Готово!');
+    }catch(e){ log('JS: '+e); toast('Сеть недоступна') }
+  }
+
+  async function loadProfile(){
+    try{
+      const r = await fetch(API()+`/api/v1/merchant/profile?restaurant_id=${RID()}`, {headers:{'X-Foody-Key':KEY()}});
+      if(!r.ok) return;
+      const p = await r.json();
+      $('prof_title').value = p.title||'';
+      $('prof_phone').value = p.phone||'';
+    }catch(_){}
+  }
+
+  async function saveProfile(){
+    const body={restaurant_id: RID(), title: $('prof_title').value||'', phone: $('prof_phone').value||''};
+    const r = await fetch(API()+'/api/v1/merchant/profile', {method:'POST', headers:{'Content-Type':'application/json','X-Foody-Key':KEY()}, body: JSON.stringify(body)});
+    if(r.ok){ toast('Профиль сохранён') } else { const t=await r.text().catch(()=> ''); log('profile: '+r.status+' '+t); toast('Ошибка сохранения') }
+  }
+
+  async function loadOffers(){
+    try{
+      const r = await fetch(API()+`/api/v1/merchant/offers?restaurant_id=${RID()}&status=active`, {headers:{'X-Foody-Key':KEY()}});
+      const arr = r.ok ? await r.json() : [];
+      const tbody = $('tbody');
+      tbody.innerHTML = arr.map(x=>{
+        const price = (x.original_price_cents? `<span class="price"><s>${rub(x.original_price_cents)} ₽</s> → </span>`:'' ) + `<b>${rub(x.price_cents)} ₽</b>`;
+        const until = new Date(x.expires_at).toLocaleString();
+        const left = `${x.qty_left}/${x.qty_total}`;
+        return `<tr>
+          <td>${x.title}</td>
+          <td>${price}</td>
+          <td>${until}</td>
+          <td>${left}</td>
+          <td><button class="btn ghost" data-id="${x.id}" data-act="archive">Архив</button></td>
+        </tr>`;
+      }).join('') || `<tr><td colspan="5" class="mut">Пока пусто</td></tr>`;
+      // bind archive
+      [...tbody.querySelectorAll('button[data-act="archive"]')].forEach(b=>{
+        b.onclick = async ()=>{
+          const id=b.getAttribute('data-id');
+          const r = await fetch(API()+`/api/v1/merchant/offers/${id}/archive`, {method:'POST', headers:{'Content-Type':'application/json','X-Foody-Key':KEY()}, body: JSON.stringify({restaurant_id: RID()})});
+          if(r.ok){ loadOffers(); toast('Отправлено в архив') } else { toast('Не удалось') }
+        };
+      });
+    }catch(e){ log('offers: '+e); }
+  }
+
+  async function createOffer(){
+    const body = {
+      restaurant_id: RID(),
+      title: ($('title').value||'').trim(),
+      description: ($('descr').value||'').trim(),
+      price_cents: numCents($('price')),
+      original_price_cents: numCents($('original_price')) || null,
+      qty_total: parseInt($('qty').value||'1',10),
+      qty_left: parseInt($('qty').value||'1',10),
+      expires_at: $('expires').value ? new Date($('expires').value).toISOString() : null
+    };
+    if(!body.title || !body.price_cents || !body.expires_at){ toast('Заполни название, цену и срок'); return }
+    const r = await fetch(API()+'/api/v1/merchant/offers', {method:'POST', headers:{'Content-Type':'application/json','X-Foody-Key':KEY()}, body: JSON.stringify(body)});
+    if(r.ok){ toast('Создано'); loadOffers(); } else { const t=await r.text().catch(()=> ''); log('create_offer: '+r.status+' '+t); toast('Не удалось создать') }
+  }
+
+  async function exportCSV(){
+    try{
+      const r = await fetch(API()+`/api/v1/merchant/export.csv?restaurant_id=${RID()}`, {headers:{'X-Foody-Key':KEY()}});
+      if(!r.ok){ toast('Ошибка экспорта'); return }
+      const txt = await r.text();
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], {type:'text/csv;charset=utf-8;'})); a.download = `foody_export_${Date.now()}.csv`; a.click();
+    }catch(e){ log('export: '+e); toast('Ошибка экспорта') }
+  }
+})();
+</script>
+</body>
+</html>
