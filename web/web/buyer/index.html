@@ -41,7 +41,15 @@
   function API(){ return resolveApi() }
   function setApi(v){ localStorage.setItem('foody_api',(v||'').trim()); $('api').value=(v||'').trim(); }
 
-  const r2 = n => (n/100).toFixed(2).replace('.',',');
+  async function hasReserve(){
+  try{
+    const r = await fetch(API()+'/openapi.json',{cache:'no-store'});
+    if(!r.ok) return false;
+    const j = await r.json();
+    return !!(j.paths && (j.paths['/api/v1/buyer/reserve']));
+  }catch(_){ return false }
+}
+const r2 = n => (n/100).toFixed(2).replace('.',',');
   const minsLeft = iso => Math.max(0, Math.floor((new Date(iso).getTime()-Date.now())/60000));
   function tierPrice(o){
     if(!o.original_price_cents || o.original_price_cents<=0) return {tier:'', eff:o.price_cents||0};
@@ -55,32 +63,33 @@
   }
 
   async function load(){
-    $('api').value = resolveApi();
-    try{
-      const r = await fetch(API()+'/api/v1/offers',{cache:'no-store'});
-      const arr = r.ok? await r.json(): [];
-      const box = $('list'); box.innerHTML='';
-      if(!arr.length){ $('empty').style.display='block'; return } else { $('empty').style.display='none' }
-      for(const x of arr){
-        const {tier, eff} = tierPrice(x);
-        const m = minsLeft(x.expires_at);
-        const el = document.createElement('div'); el.className='card';
-        el.innerHTML = `
-          <div class="row"><div class="pill">${m} мин</div>${tier? `<div class="pill">${tier}</div>`:''}</div>
-          <div style="font-size:18px;font-weight:600">${x.title}</div>
-          <div class="small">${x.description||''}</div>
-          <div class="row price">
-            ${x.original_price_cents? `<s>${r2(x.original_price_cents)} ₽</s> → `:''}
-            <b>${r2(eff||x.price_cents)} ₽</b>
-          </div>
-          <div class="row">
-            <button class="btn primary" data-id="${x.id}" data-act="reserve">Забронировать</button>
-            <div class="small">до ${new Date(x.expires_at).toLocaleString()}</div>
-          </div>
-        `;
-        box.appendChild(el);
-      }
-      // Bind reserve
+  $('api').value = resolveApi();
+  const canReserve = await hasReserve();
+  try{
+    const r = await fetch(API()+'/api/v1/offers',{cache:'no-store'});
+    const arr = r.ok? await r.json(): [];
+    const box = $('list'); box.innerHTML='';
+    if(!arr.length){ $('empty').style.display='block'; return } else { $('empty').style.display='none' }
+    for(const x of arr){
+      const {tier, eff} = tierPrice(x);
+      const m = minsLeft(x.expires_at);
+      const el = document.createElement('div'); el.className='card';
+      el.innerHTML = `
+        <div class="row"><div class="pill">${m} мин</div>${tier? `<div class="pill">${tier}</div>`:''}</div>
+        <div style="font-size:18px;font-weight:600">${x.title}</div>
+        <div class="small">${x.description||''}</div>
+        <div class="row price">
+          ${x.original_price_cents? `<s>${r2(x.original_price_cents)} ₽</s> → `:''}
+          <b>${r2(eff||x.price_cents)} ₽</b>
+        </div>
+        <div class="row">
+          ${canReserve ? `<button class="btn primary" data-id="${x.id}" data-act="reserve">Забронировать</button>` : `<button class="btn" disabled>Бронь не поддерживается</button>`}
+          <div class="small">до ${new Date(x.expires_at).toLocaleString()}</div>
+        </div>
+      `;
+      box.appendChild(el);
+    }
+    if(canReserve){
       [...document.querySelectorAll('button[data-act="reserve"]')].forEach(b=>{
         b.onclick = async ()=>{
           const id = b.getAttribute('data-id');
@@ -103,10 +112,12 @@
           }catch(e){ alert('Сеть недоступна') }
         }
       });
-    }catch(e){ $('empty').style.display='block'; }
-  }
+    }
+  }catch(e){ $('empty').style.display='block'; }
+}
 
-  setInterval(load, 30000);
+setInterval(load, 30000);
+(load, 30000);
   document.addEventListener('DOMContentLoaded', ()=>{
     $('btnSaveApi').onclick = ()=>{ setApi($('api').value); load(); };
     $('btnReload').onclick = ()=> load();

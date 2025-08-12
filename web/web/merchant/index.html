@@ -151,6 +151,14 @@
 <script>
 (function(){
   // --- Utils
+  async function discoverAPI(){
+    try{
+      const r = await fetch(API()+'/openapi.json',{cache:'no-store'});
+      if(!r.ok) return {};
+      const j = await r.json();
+      return j.paths || {};
+    }catch(_){ return {} }
+  }
   const $ = id => document.getElementById(id);
   const toast = t => { const d=document.createElement('div'); d.className='toast'; d.textContent=t; document.body.appendChild(d); setTimeout(()=>d.remove(),2500); };
   const pad = n => String(n).padStart(2,'0');
@@ -217,41 +225,51 @@
 
   // --- Actions
   async function archiveOffer(id){
-    try{
-      // Try JSON POST
-      let r = await fetch(API()+`/api/v1/merchant/offers/${id}/archive`, {
+  try{
+    const paths = await discoverAPI();
+    const candidates = [];
+    for(const p of Object.keys(paths||{})){
+      if(/archive/.test(p) && /offer/.test(p)) candidates.push(p);
+    }
+    candidates.push(`/api/v1/merchant/offers/${id}/archive`);
+    candidates.push(`/api/v1/merchant/offers/archive/${id}`);
+    candidates.push(`/api/v1/merchant/archive/${id}`);
+    candidates.push(`/api/v1/merchant/archive_offer/${id}`);
+    candidates.push(`/api/v1/merchant/archive`);
+    for(const p of candidates){
+      let url = p.includes('{') ? p.replace('{offer_id}', id).replace('{id}', id) : p;
+      if(!url.includes(id) && /archive$/.test(url)) url = url + `/${id}`;
+      let r = await fetch(API()+url, {
         method:'POST',
         headers:{'Content-Type':'application/json','X-Foody-Key':KEY()},
-        body: JSON.stringify({restaurant_id: RID()})
+        body: JSON.stringify({restaurant_id: RID(), offer_id: id})
       });
       if(!r.ok){
-        // Fallback: text/plain
-        r = await fetch(API()+`/api/v1/merchant/offers/${id}/archive`, {
+        r = await fetch(API()+url, {
           method:'POST',
           headers:{'Content-Type':'text/plain','X-Foody-Key':KEY()},
-          body: JSON.stringify({restaurant_id: RID()})
+          body: JSON.stringify({restaurant_id: RID(), offer_id: id})
         });
       }
-      if(!r.ok){
-        // Fallback: query param + empty POST
-        r = await fetch(API()+`/api/v1/merchant/offers/${id}/archive?restaurant_id=${RID()}`, {
+      if(!r.ok && url.endsWith('/archive')){
+        r = await fetch(API()+`${url}?restaurant_id=${RID()}&offer_id=${id}`, {
           method:'POST',
           headers:{'X-Foody-Key':KEY()}
         });
       }
       if(!r.ok){
-        // Legacy GET fallback
-        r = await fetch(API()+`/api/v1/merchant/offers/${id}/archive?restaurant_id=${RID()}`, {
+        r = await fetch(API()+`${url}?restaurant_id=${RID()}&offer_id=${id}`, {
           method:'GET',
           headers:{'X-Foody-Key':KEY()}
         });
       }
-      if(r.ok){ toast('Отправлено в архив'); loadOffers(); }
-      else { const t=await r.text().catch(()=> ''); log('archive: '+r.status+' '+t); toast('Не удалось отправить в архив'); }
-    }catch(e){
-      log('archive js: '+e); toast('Сеть недоступна');
+      if(r.ok){ toast('Отправлено в архив'); loadOffers(); return }
     }
+    toast('Не удалось отправить в архив');
+  }catch(e){
+    log('archive js: '+e); toast('Сеть недоступна');
   }
+}
 
   async function exportCSV(){
     try{
@@ -271,7 +289,7 @@
       a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
       a.download = `foody_export_${Date.now()}.csv`;
       a.click();
-      toast('CSV сформирован локально');
+      toast('CSV сформирован локально (без бэка)');
     }catch(e){
       log('export js: '+e); toast('Ошибка экспорта');
     }
