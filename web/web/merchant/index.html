@@ -159,6 +159,7 @@
   function setApi(v){ localStorage.setItem('foody_api', (v||'').trim()); $('api').value=(v||'').trim(); }
 
   // --- State
+  let OFFERS_CACHE = [];
   const RID = () => { try{ return (JSON.parse(localStorage.getItem('foody_restaurant')||'{}').id)||'' }catch(_){ return '' } };
   const KEY = () => localStorage.getItem('foody_key')||'';
 
@@ -203,6 +204,67 @@
   }
 
   // --- Actions
+  async function archiveOffer(id){
+    try{
+      // Try JSON POST
+      let r = await fetch(API()+`/api/v1/merchant/offers/${id}/archive`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Foody-Key':KEY()},
+        body: JSON.stringify({restaurant_id: RID()})
+      });
+      if(!r.ok){
+        // Fallback: text/plain
+        r = await fetch(API()+`/api/v1/merchant/offers/${id}/archive`, {
+          method:'POST',
+          headers:{'Content-Type':'text/plain','X-Foody-Key':KEY()},
+          body: JSON.stringify({restaurant_id: RID()})
+        });
+      }
+      if(!r.ok){
+        // Fallback: query param + empty POST
+        r = await fetch(API()+`/api/v1/merchant/offers/${id}/archive?restaurant_id=${RID()}`, {
+          method:'POST',
+          headers:{'X-Foody-Key':KEY()}
+        });
+      }
+      if(!r.ok){
+        // Legacy GET fallback
+        r = await fetch(API()+`/api/v1/merchant/offers/${id}/archive?restaurant_id=${RID()}`, {
+          method:'GET',
+          headers:{'X-Foody-Key':KEY()}
+        });
+      }
+      if(r.ok){ toast('Отправлено в архив'); loadOffers(); }
+      else { const t=await r.text().catch(()=> ''); log('archive: '+r.status+' '+t); toast('Не удалось отправить в архив'); }
+    }catch(e){
+      log('archive js: '+e); toast('Сеть недоступна');
+    }
+  }
+
+  async function exportCSV(){
+    try{
+      // Клиентский экспорт из кеша OFFERS_CACHE
+      if(!Array.isArray(OFFERS_CACHE) || OFFERS_CACHE.length===0){
+        await loadOffers();
+      }
+      const rows = [['id','title','price_cents','original_price_cents','qty_left','qty_total','expires_at','archived_at']];
+      for(const x of (OFFERS_CACHE||[])){
+        rows.push([x.id, x.title||'', x.price_cents||'', x.original_price_cents||'', x.qty_left||'', x.qty_total||'', x.expires_at||'', x.archived_at||'']);
+      }
+      const csv = rows.map(r=>r.map(v=>{
+        const s = String(v??'');
+        return /[",;\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+      }).join(',')).join('\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
+      a.download = `foody_export_${Date.now()}.csv`;
+      a.click();
+      toast('CSV сформирован локально');
+    }catch(e){
+      log('export js: '+e); toast('Ошибка экспорта');
+    }
+  }
+
   async function registerRestaurant(){
     const name=($('name').value||'').trim();
     const phone=($('phone').value||'').trim();
@@ -252,7 +314,7 @@
   async function loadOffers(){
     try{
       const r = await fetch(API()+`/api/v1/merchant/offers?restaurant_id=${RID()}&status=active`, {headers:{'X-Foody-Key':KEY()}});
-      const arr = r.ok ? await r.json() : [];
+      const arr = r.ok ? await r.json() : []; OFFERS_CACHE = arr;
       const tbody = $('tbody');
       tbody.innerHTML = arr.map(x=>{
         const price = (x.original_price_cents? `<span class="price"><s>${rub(x.original_price_cents)} ₽</s> → </span>`:'' ) + `<b>${rub(x.price_cents)} ₽</b>`;
@@ -263,15 +325,14 @@
           <td>${price}</td>
           <td>${until}</td>
           <td>${left}</td>
-          <td><button class="btn ghost" data-id="${x.id}" data-act="archive">Архив</button></td>
+          <td><button class="btn ghost" data-id="${x.id}" data-act="archive" class="archive-btn">Архив</button></td>
         </tr>`;
       }).join('') || `<tr><td colspan="5" class="mut">Пока пусто</td></tr>`;
       // bind archive
       [...tbody.querySelectorAll('button[data-act="archive"]')].forEach(b=>{
         b.onclick = async ()=>{
-          const id=b.getAttribute('data-id');
-          const r = await fetch(API()+`/api/v1/merchant/offers/${id}/archive`, {method:'POST', headers:{'Content-Type':'application/json','X-Foody-Key':KEY()}, body: JSON.stringify({restaurant_id: RID()})});
-          if(r.ok){ loadOffers(); toast('Отправлено в архив') } else { toast('Не удалось') }
+          const id = b.getAttribute('data-id');
+          await archiveOffer(id);
         };
       });
     }catch(e){ log('offers: '+e); }
