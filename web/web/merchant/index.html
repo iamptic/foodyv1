@@ -207,10 +207,24 @@
     const name=($('name').value||'').trim();
     const phone=($('phone').value||'').trim();
     if(!name){ toast('Введите название'); return }
-    // wake backend
     for(let i=0;i<2;i++){ try{ await fetch(API()+'/health',{cache:'no-store'}) }catch(_){} }
     try{
-      const r = await fetch(API()+'/api/v1/merchant/register_public', {method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({title:name, phone})});
+      let r = await fetch(API()+'/api/v1/merchant/register_public', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({title:name, phone})
+      });
+      if(!r.ok){
+        const t=await r.text().catch(()=>'');
+        log('register_public (json): '+r.status+' '+t);
+        if(r.status===415 || r.status===422 || r.status===400){
+          r = await fetch(API()+'/api/v1/merchant/register_public', {
+            method:'POST',
+            headers:{'Content-Type':'text/plain'},
+            body: JSON.stringify({title:name, phone})
+          });
+        }
+      }
       if(!r.ok){ const t=await r.text().catch(()=> ''); log('register_public: '+r.status+' '+t); toast('Ошибка регистрации'); return }
       const data = await r.json();
       localStorage.setItem('foody_restaurant', JSON.stringify({id:data.restaurant_id, title:name, phone}));
