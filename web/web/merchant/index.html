@@ -101,7 +101,19 @@
         </div>
       </div>
 
-      <div class="card" id="cardGrid" style="display:none">
+      <div class="card">
+  <h3>Касса: погашение брони</h3>
+  <div class="row"><div><input id="redeemCode" placeholder="Ввести код"></div>
+  <div><button class="btn primary" id="btnRedeem">Погасить</button></div></div>
+  <div class="mut">Сканер QR можно подключить как клавиатуру. Если сервис не поддерживает резервы — блок скроется.</div>
+</div>
+
+<div class="card" id="kpiCard" style="display:none">
+  <h3>KPI</h3>
+  <div id="kpiBox" class="mut">Загрузка...</div>
+</div>
+
+<div class="card" id="cardGrid" style="display:none">
         <h3>Мои офферы</h3>
         <table class="tbl" id="offersTbl">
           <thead><tr><th>Название</th><th>Цена</th><th>До</th><th>Остаток</th><th></th></tr></thead>
@@ -173,7 +185,7 @@
     };
     $('btnClear').onclick = ()=>{ localStorage.removeItem('foody_restaurant'); localStorage.removeItem('foody_key'); location.reload() };
 
-    $('btnRegister').onclick = registerRestaurant;
+    $('btnRegister').onclick = registerRestaurant; document.getElementById('btnRedeem').onclick = redeem;
     $('btnSaveProfile').onclick = saveProfile;
     $('btnCreateOffer').onclick = createOffer;
     $('btnExport').onclick = exportCSV;
@@ -200,7 +212,7 @@
     $('cardGrid').style.display='block';
     $('cardProfile').style.display='block';
     $('rid').value = RID();
-    loadProfile(); loadOffers();
+    loadProfile(); loadOffers(); loadKPI();
   }
 
   // --- Actions
@@ -293,6 +305,39 @@
       localStorage.setItem('foody_key', data.api_key);
       enterLK(); toast('Готово!');
     }catch(e){ log('JS: '+e); toast('Сеть недоступна') }
+  }
+
+  async function redeem(){
+    try{
+      const code = (document.getElementById('redeemCode')?.value||'').trim();
+      if(!code){ toast('Введите код'); return }
+      let r = await fetch(API() + '/api/v1/merchant/redeem', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Foody-Key':KEY()},
+        body: JSON.stringify({restaurant_id: RID(), code})
+      });
+      if(!r.ok){
+        const t=await r.text().catch(()=>'');
+        log('redeem: '+r.status+' '+t);
+        if(r.status===404){ document.getElementById('redeemCode').value=''; return }
+        toast('Ошибка погашения'); return
+      }
+      toast('Погашено'); document.getElementById('redeemCode').value=''; loadKPI();
+    }catch(e){ log('redeem js: '+e); toast('Сеть недоступна') }
+  }
+
+  async function loadKPI(){
+    try{
+      const r = await fetch(API() + `/api/v1/merchant/kpi?restaurant_id=${RID()}`, {headers:{'X-Foody-Key':KEY()}});
+      if(!r.ok){ document.getElementById('kpiCard').style.display='none'; return }
+      const k = await r.json();
+      const rub = n=> (n/100).toFixed(2).replace('.',',');
+      document.getElementById('kpiCard').style.display='block';
+      document.getElementById('kpiBox').innerHTML = `
+        Броней: <b>${k.reserved}</b>, Выдач: <b>${k.redeemed}</b>, Конверсия: <b>${(k.redemption_rate*100).toFixed(1)}%</b><br/>
+        Выручка: <b>${rub(k.revenue_cents)} ₽</b> · Экономия гостя: <b>${rub(k.saved_cents)} ₽</b>
+      `;
+    }catch(e){ document.getElementById('kpiCard').style.display='none'; }
   }
 
   async function loadProfile(){
