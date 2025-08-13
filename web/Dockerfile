@@ -1,8 +1,5 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev || npm i --production
 COPY . .
-ENV PORT=8080
-EXPOSE 8080
+RUN npm i --omit=dev
 CMD ["node","server.js"]

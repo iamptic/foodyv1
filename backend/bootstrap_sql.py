@@ -9,6 +9,8 @@ DDL_CREATE = [
         city TEXT,
         address TEXT,
         geo TEXT,
+        lat DOUBLE PRECISION,
+        lon DOUBLE PRECISION,
         created_at TIMESTAMPTZ DEFAULT NOW()
     )""",
     """CREATE TABLE IF NOT EXISTS foody_offers (
@@ -22,7 +24,16 @@ DDL_CREATE = [
         qty_total INTEGER NOT NULL DEFAULT 0,
         expires_at TIMESTAMPTZ,
         archived_at TIMESTAMPTZ,
+        photo_url TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS foody_reservations (
+        id TEXT PRIMARY KEY,
+        offer_id TEXT NOT NULL REFERENCES foody_offers(id) ON DELETE CASCADE,
+        code TEXT UNIQUE NOT NULL,
+        status TEXT NOT NULL DEFAULT 'reserved',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        redeemed_at TIMESTAMPTZ
     )"""
 ]
 
@@ -31,12 +42,15 @@ DDL_ALTER = [
     "ALTER TABLE IF EXISTS foody_restaurants ADD COLUMN IF NOT EXISTS city TEXT",
     "ALTER TABLE IF EXISTS foody_restaurants ADD COLUMN IF NOT EXISTS address TEXT",
     "ALTER TABLE IF EXISTS foody_restaurants ADD COLUMN IF NOT EXISTS geo TEXT",
+    "ALTER TABLE IF EXISTS foody_restaurants ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION",
+    "ALTER TABLE IF EXISTS foody_restaurants ADD COLUMN IF NOT EXISTS lon DOUBLE PRECISION",
     "ALTER TABLE IF EXISTS foody_offers ADD COLUMN IF NOT EXISTS original_price_cents INTEGER",
     "ALTER TABLE IF EXISTS foody_offers ADD COLUMN IF NOT EXISTS price_cents INTEGER",
     "ALTER TABLE IF EXISTS foody_offers ADD COLUMN IF NOT EXISTS qty_left INTEGER",
     "ALTER TABLE IF EXISTS foody_offers ADD COLUMN IF NOT EXISTS qty_total INTEGER",
     "ALTER TABLE IF EXISTS foody_offers ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ",
-    "ALTER TABLE IF EXISTS foody_offers ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ"
+    "ALTER TABLE IF EXISTS foody_offers ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ",
+    "ALTER TABLE IF EXISTS foody_offers ADD COLUMN IF NOT EXISTS photo_url TEXT"
 ]
 
 async def run():
@@ -44,9 +58,12 @@ async def run():
     if not url:
         print("BOOTSTRAP: DATABASE_URL not set, skip migrations")
         return
-    conn = None
     try:
         conn = await asyncpg.connect(url)
+    except Exception as e:
+        print("BOOTSTRAP: Cannot connect to DB:", repr(e))
+        return
+    try:
         for sql in DDL_CREATE:
             try:
                 await conn.execute(sql)
@@ -57,11 +74,9 @@ async def run():
                 await conn.execute(sql)
             except Exception as e:
                 print("BOOTSTRAP ALTER WARN:", sql, "->", repr(e))
-    except Exception as e:
-        print("BOOTSTRAP: Cannot connect to DB:", repr(e))
     finally:
         try:
-            if conn: await conn.close()
+            await conn.close()
         except Exception:
             pass
 
