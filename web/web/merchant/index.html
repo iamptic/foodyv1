@@ -1,1 +1,144 @@
-<!doctype html><meta charset="utf-8"><script src="/config.js"></script><h1>Foody LK</h1>
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foody — Кабинет</title>
+<script src="/config.js"></script>
+<style>
+  body{font-family:Inter,system-ui,Arial,sans-serif;margin:0;background:#0b0c10;color:#eee}
+  header{padding:16px 20px;background:#111;border-bottom:1px solid #222;display:flex;gap:12px;align-items:center}
+  header h1{font-size:18px;margin:0}
+  .wrap{max-width:960px;margin:0 auto;padding:16px}
+  .row{display:flex;gap:14px;flex-wrap:wrap}
+  .card{flex:1;min-width:280px;background:#14161a;border:1px solid #1f232a;border-radius:14px;padding:14px}
+  input,button{font:inherit;border-radius:10px;border:1px solid #2a2f38;background:#0f1115;color:#eee;padding:8px 10px}
+  button{cursor:pointer}
+  label{font-size:12px;opacity:.8;display:block;margin-bottom:6px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+  .title{font-weight:600;margin:0 0 6px}
+  .strike{opacity:.6;text-decoration:line-through;margin-left:8px;font-size:14px}
+  .badge{display:inline-block;padding:4px 8px;border-radius:10px;background:#1f3b2e;color:#8ee59b;font-weight:600;font-size:12px;margin-left:8px}
+</style>
+<header>
+  <h1>Foody — ЛК ресторана</h1>
+  <div style="margin-left:auto"><a href="/web/buyer/" style="color:#9ecbff">← Витрина</a></div>
+</header>
+<div class="wrap">
+  <div class="row">
+    <div class="card" style="max-width:320px">
+      <div style="font-weight:600;margin-bottom:8px">Вход</div>
+      <div id="loginBox">
+        <label>Restaurant ID</label>
+        <input id="rid" placeholder="RID_..." />
+        <label style="margin-top:6px">API KEY</label>
+        <input id="key" placeholder="KEY_..." />
+        <div style="margin-top:10px"><button id="saveBtn">Сохранить</button></div>
+        <div style="opacity:.7;font-size:12px;margin-top:8px">* Или просто зарегистрируйтесь ниже</div>
+      </div>
+      <div id="whoami" style="display:none"></div>
+    </div>
+    <div class="card" style="flex:2">
+      <div style="font-weight:600;margin-bottom:8px">Регистрация</div>
+      <div class="row" style="gap:8px">
+        <input id="reg_title" placeholder="Название *" style="min-width:220px">
+        <input id="reg_phone" placeholder="Телефон">
+        <button id="reg_btn">Зарегистрировать</button>
+      </div>
+      <div id="reg_out" style="margin-top:8px;opacity:.8;font-size:12px"></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div style="font-weight:600;margin-bottom:8px">Создать оффер</div>
+    <div class="row" style="gap:8px">
+      <input id="o_title" placeholder="Название *">
+      <input id="o_price" placeholder="Цена, копейки *">
+      <input id="o_orig" placeholder="Оригинальная цена, копейки">
+      <input id="o_qty" placeholder="Кол-во *">
+      <input id="o_exp" placeholder="ISO время истечения (UTC)">
+      <button id="o_btn">Создать</button>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div style="font-weight:600;margin-bottom:8px">Мои офферы</div>
+    <div id="offers" class="grid"></div>
+  </div>
+</div>
+<script>
+const API = (window.foodyApi||'').replace(/\/$/,''); 
+const st = {
+  get rid(){return localStorage.getItem('RID')||''},
+  set rid(v){localStorage.setItem('RID',v)},
+  get key(){return localStorage.getItem('KEY')||''},
+  set key(v){localStorage.setItem('KEY',v)},
+};
+function $(id){return document.getElementById(id)}
+function money(c){return (c/100).toLocaleString('ru-RU',{style:'currency',currency:'RUB'})}
+function authHeaders(){return {'X-Foody-Key': st.key}}
+
+async function loadProfile(){
+  if(!st.rid || !st.key){ $('loginBox').style.display='block'; $('whoami').style.display='none'; return; }
+  try{
+    const r = await fetch(API + '/api/v1/merchant/profile?restaurant_id='+encodeURIComponent(st.rid), {headers: authHeaders()});
+    if(!r.ok) throw new Error(await r.text());
+    const p = await r.json();
+    $('loginBox').style.display='none';
+    $('whoami').style.display='block';
+    $('whoami').innerHTML = '<div><b>RID:</b> '+st.rid+'<br><b>KEY:</b> '+st.key+'<br><b>Название:</b> '+(p.title||'')+'</div>';
+    await loadOffers();
+  }catch(e){
+    $('loginBox').style.display='block'; $('whoami').style.display='none';
+  }
+}
+
+async function loadOffers(){
+  if(!st.rid) return;
+  const r = await fetch(API + '/api/v1/merchant/offers?restaurant_id='+encodeURIComponent(st.rid)+'&status=active', {headers: authHeaders()});
+  const arr = await r.json();
+  const el = $('offers'); el.innerHTML='';
+  for(const it of arr){
+    const div = document.createElement('div'); div.className='card';
+    div.innerHTML = '<div class="title">'+(it.title||'')+'</div>' +
+      '<div>'+money(it.price_cents)+(it.original_price_cents?'<span class="strike">'+money(it.original_price_cents)+'</span>':'')+'</div>'+
+      '<div style="margin-top:8px"><button data-id="'+it.id+'">Удалить</button></div>';
+    div.querySelector('button').onclick = async (ev)=>{
+      const id = ev.target.getAttribute('data-id');
+      await fetch(API + '/api/v1/merchant/offers/'+id+'?restaurant_id='+encodeURIComponent(st.rid), {method:'DELETE', headers: authHeaders()});
+      loadOffers();
+    };
+    el.appendChild(div);
+  }
+}
+
+$('saveBtn').onclick = ()=>{ st.rid=$('rid').value.trim(); st.key=$('key').value.trim(); loadProfile(); };
+$('reg_btn').onclick = async ()=>{
+  const title = $('reg_title').value.trim(); if(!title){alert('Название обязательно'); return;}
+  const phone = $('reg_phone').value.trim();
+  const r = await fetch(API + '/api/v1/merchant/register_public', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({title, phone})});
+  const data = await r.json();
+  if(data.restaurant_id && data.api_key){
+    st.rid=data.restaurant_id; st.key=data.api_key; $('reg_out').textContent='Готово. RID/KEY сохранены. '; loadProfile();
+  }else{
+    $('reg_out').textContent='Не удалось зарегистрировать: '+JSON.stringify(data);
+  }
+};
+$('o_btn').onclick = async ()=>{
+  if(!st.rid||!st.key){alert('Сначала войдите'); return;}
+  const body = {
+    restaurant_id: st.rid,
+    title: $('o_title').value.trim(),
+    price_cents: parseInt($('o_price').value||'0',10),
+    original_price_cents: parseInt($('o_orig').value||'0',10)||null,
+    qty_total: parseInt($('o_qty').value||'0',10),
+    qty_left: parseInt($('o_qty').value||'0',10),
+    expires_at: $('o_exp').value.trim()||null
+  };
+  await fetch(API + '/api/v1/merchant/offers', {method:'POST', headers: {'Content-Type':'application/json', ...authHeaders()}, body: JSON.stringify(body)});
+  loadOffers();
+};
+
+// автологин
+window.addEventListener('load', ()=>{
+  $('rid').value = st.rid;
+  $('key').value = st.key;
+  loadProfile();
+});
+</script>

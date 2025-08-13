@@ -1,1 +1,67 @@
-<!doctype html><meta charset="utf-8"><script src="/config.js"></script><h1>Foody Buyer</h1>
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foody — Buyer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<script src="/config.js"></script>
+<style>
+  body{font-family:Inter,system-ui,Arial,sans-serif;margin:0;background:#0b0c10;color:#eee}
+  header{padding:16px 20px;background:#111;border-bottom:1px solid #222;display:flex;align-items:center;gap:12px}
+  header h1{font-size:18px;margin:0}
+  .wrap{max-width:920px;margin:0 auto;padding:16px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+  .card{background:#14161a;border:1px solid #1f232a;border-radius:14px;padding:14px}
+  .title{font-weight:600;margin:0 0 6px}
+  .price{font-size:18px;margin:8px 0}
+  .strike{opacity:.6;text-decoration:line-through;margin-left:8px;font-size:14px}
+  .badge{display:inline-block;padding:4px 8px;border-radius:10px;background:#1f3b2e;color:#8ee59b;font-weight:600;font-size:12px;margin-left:8px}
+  .sub{opacity:.7;font-size:12px}
+  .empty{opacity:.7;padding:40px 0;text-align:center}
+  a.btn{display:inline-block;padding:8px 12px;border:1px solid #2a2f38;border-radius:10px;color:#dbe4ff;text-decoration:none;font-size:14px}
+</style>
+<header>
+  <h1>Foody — Витрина</h1>
+  <div style="margin-left:auto"><a class="btn" href="/web/merchant/">ЛК ресторана →</a></div>
+</header>
+<div class="wrap">
+  <div id="list" class="grid"></div>
+  <div id="empty" class="empty" style="display:none">Пока нет активных офферов</div>
+</div>
+<script>
+const API = (window.foodyApi||'').replace(/\/$/,''); // trim trailing slash
+async function fetchOffers(){
+  try{
+    const r = await fetch(API + '/api/v1/offers', {credentials:'omit'});
+    const data = await r.json();
+    render(data||[]);
+  }catch(e){
+    console.error(e);
+    document.getElementById('empty').textContent='Ошибка загрузки витрины'; 
+    document.getElementById('empty').style.display='block';
+  }
+}
+function money(cents){return (cents/100).toLocaleString('ru-RU',{style:'currency',currency:'RUB'})}
+function esc(s){return (s||'').replace(/[&<>]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]))}
+function render(items){
+  const list = document.getElementById('list');
+  const empty = document.getElementById('empty');
+  list.innerHTML='';
+  if(!items.length){ empty.style.display='block'; return; }
+  empty.style.display='none';
+  for(const it of items){
+    const price = money(it.price_cents_effective ?? it.price_cents);
+    const orig = it.original_price_cents ? '<span class="strike">'+money(it.original_price_cents)+'</span>' : '';
+    const badge = it.timer_step ? '<span class="badge">'+it.timer_step+'</span>' : '';
+    const expires = it.expires_at ? new Date(it.expires_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) : '—';
+    const card = document.createElement('div');
+    card.className='card';
+    card.innerHTML = `<div class="title">${esc(it.title||'Без названия')}</div>
+      <div class="price">${price}${orig}${badge}</div>
+      <div class="sub">До: ${esc(expires)} • Остаток: ${it.qty_left ?? 0}</div>`;
+    list.appendChild(card);
+  }
+}
+fetchOffers();
+</script>
