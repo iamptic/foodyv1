@@ -67,7 +67,7 @@ async def auth(conn: asyncpg.Connection, key: str, restaurant_id: Optional[str])
 @app.on_event("startup")
 async def _startup():
     # Run migrations
-    bootstrap_sql.ensure()
+    await bootstrap_sql.ensure()
     # Seed data if needed
     try:
         p = await pool()
