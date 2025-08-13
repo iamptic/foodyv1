@@ -1,3 +1,0 @@
-/* минимальные стили, чтобы не ломать существующую тему */
-:root { color-scheme: light; }
-body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
