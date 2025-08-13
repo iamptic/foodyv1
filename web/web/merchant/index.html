@@ -26,7 +26,7 @@ label{display:block;margin:6px 0 6px 2px;color:#cbd1de;font-size:12px}input,text
 
 <div class="card" id="cardRegister"><h3>Регистрация</h3>
 <div class="grid g2"><div><label>Название</label><input id="name" placeholder="Пекарня №1"></div><div><label>Телефон</label><input id="phone" placeholder="+7..."></div></div>
-<div class="grid g3"><div><label>Город</label><input id="city" placeholder="Москва"></div><div><label>Адрес</label><input id="addr" placeholder="ул. Примерная, 1"></div><div><label>Геолокация</label><div class="row"><button class="btn" id="btnGeo">Определить</button><span class="mut" id="geoLbl">нет</span></div></div></div>
+<div class="grid g3"><div><label>Город</label><input id="city" placeholder="Москва"></div><div><label>Адрес</label><input id="addr" placeholder="ул. Примерная, 1"></div><div><label>Геолокация</label><div class="row"><button class="btn" id="btnGeo">Определить</button><span class="mut" id="geoLbl" class="mut">нет</span></div></div></div>
 <div class="row" style="margin-top:8px"><button class="btn primary" id="btnRegister">Сохранить</button><span class="mut">RID и ключ сохранятся локально</span></div></div>
 
 <div class="card" id="cardOffer" style="display:none"><h3>Новый оффер</h3>
@@ -123,22 +123,41 @@ label{display:block;margin:6px 0 6px 2px;color:#cbd1de;font-size:12px}input,text
       const r=await fetch(API()+`/api/v1/merchant/offers?restaurant_id=${RID()}&status=active`,{headers:{'X-Foody-Key':KEY()}});
       const arr=r.ok?await r.json():[]; OFFERS_CACHE=arr; const arch=localArchived();
       const tbody=$('tbody'); tbody.innerHTML=arr.map(x=>{const price=(x.original_price_cents?`<span class="price"><s>${rub(x.original_price_cents)} ₽</s> → </span>`:'')+`<b>${rub(x.price_cents)} ₽</b>`; const until=new Date(x.expires_at).toLocaleString(); const left=`${x.qty_left}/${x.qty_total}`; const local=arch.has(x.id);
-        return `<tr data-id="${x.id}"><td>${x.title} ${local?'<span class="pill badge-arch">локально в архиве</span>':''}</td><td>${price}</td><td>${until}</td><td>${left}</td><td class="row"><button class="btn" data-act="edit">Редактировать</button><button class="btn" data-act="dup">Дублировать</button><button class="btn" data-act="archive">Архив</button></td></tr>`;}).join('')||`<tr><td colspan="5" class="mut">Пока пусто</td></tr>`;
-      [...tbody.querySelectorAll('tr')].forEach(tr=>{const id=tr.getAttribute('data-id'); const bind=(act,fn)=>{const b=tr.querySelector(`[data-act="${act}"]`); if(b) b.onclick=()=>fn(id)}; bind('archive',archiveOffer); bind('edit',openEdit); bind('dup',duplicateOffer); });
+        return `<tr data-id="${x.id}"><td>${x.title} ${local?'<span class="pill badge-arch">локально в архиве</span>':''}</td><td>${price}</td><td>${until}</td><td>${left}</td><td class="row"><button class="btn" data-act="edit">Редактировать</button><button class="btn" data-act="dup">Дублировать</button><button class="btn" data-act="delete">Удалить</button></td></tr>`;}).join('')||`<tr><td colspan="5" class="mut">Пока пусто</td></tr>`;
+      [...tbody.querySelectorAll('tr')].forEach(tr=>{const id=tr.getAttribute('data-id'); const bind=(act,fn)=>{const b=tr.querySelector(`[data-act="${act}"]`); if(b) b.onclick=()=>fn(id)}; bind('delete', deleteOffer); bind('edit',openEdit); bind('dup',duplicateOffer); });
     }catch(e){ log('offers: '+e); }
   }
 
-  async function archiveOffer(id){
-    try{
-      const paths=await discoverAPI(); const c=[]; for(const p of Object.keys(paths||{})){ if(/archive/.test(p)&&/offer/.test(p)) c.push(p); }
-      c.push(`/api/v1/merchant/offers/${id}/archive`, `/api/v1/merchant/offers/archive/${id}`, `/api/v1/merchant/archive/${id}`, `/api/v1/merchant/archive_offer/${id}`, `/api/v1/merchant/archive`);
-      for(const p of c){ let url=p.includes('{')?p.replace('{offer_id}',id).replace('{id}',id):p; if(!url.includes(id)&&/archive$/.test(url)) url=url+`/${id}`;
-        let r=await fetch(API()+url,{method:'POST',headers:{'Content-Type':'application/json','X-Foody-Key':KEY()},body:JSON.stringify({restaurant_id:RID(),offer_id:id})});
-        if(!r.ok){ r=await fetch(API()+url,{method:'POST',headers:{'Content-Type':'text/plain','X-Foody-Key':KEY()},body:JSON.stringify({restaurant_id:RID(),offer_id:id})}); }
-        if(!r.ok&&url.endsWith('/archive')){ r=await fetch(API()+`${url}?restaurant_id=${RID()}&offer_id=${id}`,{method:'POST',headers:{'X-Foody-Key':KEY()}}); }
-        if(!r.ok){ r=await fetch(API()+`${url}?restaurant_id=${RID()}&offer_id=${id}`,{method:'GET',headers:{'X-Foody-Key':KEY()}}); }
-        if(r.ok){ toast('Отправлено в архив'); loadOffers(); return }
+  async function deleteOffer(id){
+  try{
+    const paths = await discoverAPI();
+    const candidates = [];
+    for(const p of Object.keys(paths||{})){
+      if(/delete/.test(p) && /offer/.test(p)) candidates.push(p);
+      if(/offers\/.+\{(id|offer_id)\}/.test(p) && (paths[p].delete || /delete/.test(JSON.stringify(paths[p]||{})))) candidates.push(p);
+    }
+    candidates.push(`/api/v1/merchant/offers/${id}`); // DELETE common
+    candidates.push(`/api/v1/merchant/offers/${id}/delete`);
+    candidates.push(`/api/v1/merchant/delete_offer/${id}`);
+    candidates.push(`/api/v1/merchant/offers/delete/${id}`);
+    for(const p of candidates){
+      let url = p.includes('{') ? p.replace('{offer_id}', id).replace('{id}', id) : p;
+      let r = await fetch(API()+url, { method:'DELETE', headers:{'X-Foody-Key':KEY()} });
+      if(!r.ok){
+        r = await fetch(API()+url, { method:'POST', headers:{'Content-Type':'application/json','X-Foody-Key':KEY()}, body: JSON.stringify({restaurant_id: RID(), offer_id:id, action:'delete'}) });
       }
+      if(!r.ok){
+        r = await fetch(API()+`${url}?restaurant_id=${RID()}&offer_id=${id}`, { method:'POST', headers:{'X-Foody-Key':KEY()} });
+      }
+      if(r.ok){ toast('Удалено'); loadOffers(); return }
+    }
+    // Local fallback: hide row
+    const set = localArchived(); set.add(id); saveLocalArchived(set); // reuse local set to hide
+    toast('Удалено локально'); loadOffers();
+  }catch(e){
+    log('delete js: '+e); toast('Сеть недоступна');
+  }
+}
       const set=localArchived(); set.add(id); saveLocalArchived(set); toast('Помечено локально как архив'); loadOffers();
     }catch(e){ log('archive js: '+e); toast('Сеть недоступна') }
   }
@@ -158,8 +177,8 @@ label{display:block;margin:6px 0 6px 2px;color:#cbd1de;font-size:12px}input,text
 
   function renderFromCache(){ const arch=localArchived(); const tbody=$('tbody'); tbody.innerHTML=OFFERS_CACHE.map(x=>{
     const price=(x.original_price_cents?`<span class="price"><s>${rub(x.original_price_cents)} ₽</s> → </span>`:'')+`<b>${rub(x.price_cents)} ₽</b>`; const until=new Date(x.expires_at).toLocaleString(); const left=`${x.qty_left}/${x.qty_total}`; const local=arch.has(x.id);
-    return `<tr data-id="${x.id}"><td>${x.title} ${local?'<span class="pill badge-arch">локально в архиве</span>':''}</td><td>${price}</td><td>${until}</td><td>${left}</td><td class="row"><button class="btn" data-act="edit">Редактировать</button><button class="btn" data-act="dup">Дублировать</button><button class="btn" data-act="archive">Архив</button></td></tr>`;}).join('')||`<tr><td colspan="5" class="mut">Пока пусто</td></tr>`;
-    [...tbody.querySelectorAll('tr')].forEach(tr=>{const id=tr.getAttribute('data-id'); const bind=(a,f)=>{const b=tr.querySelector(`[data-act="${a}"]`); if(b) b.onclick=()=>f(id)}; bind('archive',archiveOffer); bind('edit',openEdit); bind('dup',duplicateOffer); });
+    return `<tr data-id="${x.id}"><td>${x.title} ${local?'<span class="pill badge-arch">локально в архиве</span>':''}</td><td>${price}</td><td>${until}</td><td>${left}</td><td class="row"><button class="btn" data-act="edit">Редактировать</button><button class="btn" data-act="dup">Дублировать</button><button class="btn" data-act="delete">Удалить</button></td></tr>`;}).join('')||`<tr><td colspan="5" class="mut">Пока пусто</td></tr>`;
+    [...tbody.querySelectorAll('tr')].forEach(tr=>{const id=tr.getAttribute('data-id'); const bind=(a,f)=>{const b=tr.querySelector(`[data-act="${a}"]`); if(b) b.onclick=()=>f(id)}; bind('delete', deleteOffer); bind('edit',openEdit); bind('dup',duplicateOffer); });
   }
 
   async function duplicateOffer(id){

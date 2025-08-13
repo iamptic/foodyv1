@@ -6,9 +6,23 @@
 </head><body><div class='wrap'><h1>🔥 Foody — предложения рядом</h1>
 <div class='row' style='margin-bottom:10px'><span class='mut small'>API:</span><input id='api' style='flex:1;max-width:420px;padding:8px;border-radius:10px;border:1px solid var(--br);background:#0e1117;color:#eef1f5;outline:none' placeholder='https://backend-....up.railway.app'>
 <button class='btn' id='btnSaveApi'>Сохранить</button><button class='btn' id='btnReload'>Обновить</button></div>
-<div id='list' class='grid'></div><div id='empty' class='mut' style='display:none;margin-top:8px'>Пока нет активных офферов</div></div>
+<div id='list' class='grid'></div><pre id='buyerLog' class='mut' style='max-height:120px;overflow:auto;border:1px dashed #2b3042;padding:8px;border-radius:12px;margin-top:8px'></pre><div id='empty' class='mut' style='display:none;margin-top:8px'>Пока нет активных офферов</div></div>
 <script>(function(){const $=id=>document.getElementById(id);function resolveApi(){const c=(window.foodyApi||'').trim(); const ls=(localStorage.getItem('foody_api')||'').trim(); const fb=location.origin.replace(/\/web$/,''); return c||ls||fb;} function API(){return resolveApi()} function setApi(v){localStorage.setItem('foody_api',(v||'').trim()); $('api').value=(v||'').trim();}
 async function hasReserve(){try{const r=await fetch(API()+'/openapi.json',{cache:'no-store'}); if(!r.ok) return false; const j=await r.json(); return !!(j.paths&&(j.paths['/api/v1/buyer/reserve']));}catch(_){return false}}
+function blog(t){ try{ document.getElementById('buyerLog').textContent = (t||'') + "\n" + document.getElementById('buyerLog').textContent }catch(_){} }
+async function discoverBuyerOffers(){
+  try{
+    const r = await fetch(API()+'/openapi.json',{cache:'no-store'});
+    if(!r.ok) return [];
+    const j = await r.json(); const paths = j.paths||{};
+    const out = [];
+    for(const p of Object.keys(paths)){
+      const ent = paths[p]||{};
+      if((ent.get) && /offer/.test(p) && !/merchant/.test(p)){ out.push(p); }
+    }
+    return out;
+  }catch(_){ return [] }
+}
 const r2=n=>(n/100).toFixed(2).replace('.',','); const minsLeft=iso=>Math.max(0, Math.floor((new Date(iso).getTime()-Date.now())/60000));
 function tierPrice(o){if(!o.original_price_cents||o.original_price_cents<=0) return {tier:'', eff:o.price_cents||0}; const m=minsLeft(o.expires_at); let disc=0,label=''; if(m<=30){disc=0.70; label='-70%'} else if(m<=60){disc=0.50; label='-50%'} else if(m<=120){disc=0.30; label='-30%'} else {return {tier:'', eff:o.price_cents||o.original_price_cents}} return {tier:label, eff:Math.round(o.original_price_cents*(1-disc))}}
 async function load(){ $('api').value=resolveApi(); const canReserve=await hasReserve(); try{ const r=await fetch(API()+'/api/v1/offers',{cache:'no-store'}); const arr=r.ok?await r.json():[]; const box=$('list'); box.innerHTML=''; if(!arr.length){ $('empty').style.display='block'; return } else { $('empty').style.display='none' }
