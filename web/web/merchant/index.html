@@ -1,221 +1,180 @@
-<!doctype html><meta charset="utf-8"><link rel="icon" href="/web/favicon.png"/>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Foody — ЛК партнёра</title><script src="/config.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="" crossorigin=""/>
-<style>
- body{font-family:Inter,system-ui,Arial,sans-serif;margin:0;background:#f7f7f9;color:#111}
- header{padding:12px 16px;background:#ffffff;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center}
- .wrap{max-width:1000px;margin:0 auto;padding:16px}
- .row{display:flex;gap:12px;flex-wrap:wrap}
- .card{flex:1;min-width:280px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;padding:14px}
- input,button,select{font:inherit;border-radius:10px;border:1px solid #2a2f38;background:#0f1115;color:#eee;padding:8px 10px}
- button{cursor:pointer}
- label{display:block;font-size:12px;opacity:.8;margin:4px 0 6px}
- .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
- .title{font-weight:600;margin:0 0 6px}
- .photo{width:100%;height:140px;background:#0f1115;border:1px solid #2a2f38;border-radius:10px;object-fit:cover;margin-bottom:8px}
- .strike{opacity:.6;text-decoration:line-through;margin-left:8px;font-size:14px}
- .tabs a{padding:6px 10px;border-radius:10px;border:1px solid #2a2f38;text-decoration:none;color:#111}
- .tabs{display:flex;gap:8px}
- #map{height:220px;border:1px solid #2a2f38;border-radius:10px}
-</style>
-<header><img src="/web/logo.png" alt="Foody" style="height:28px;margin-right:10px">
-  <div class="tabs">
-    <a href="/web/buyer/">Витрина</a>
-    <a href="/web/merchant/">ЛК партнёра</a>
-  </div>
-  <div style="margin-left:auto;display:flex;gap:8px">
-    <button id="logout">Выйти</button>
-  </div>
-<div style="margin-left:auto;font-size:12px;opacity:.6">v:nocache-1755133858</div></header>
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Foody — ЛК партнёра</title>
+  <link rel="icon" href="/web/favicon.png"/>
+  <script src="/config.js"></script>
+  <style>
+    :root{--bg:#f7f7f9;--fg:#111;--muted:#666;--card:#fff;--border:#e5e7eb;--btn:#111;--btnfg:#fff}
+    *{box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;background:var(--bg);color:var(--fg);margin:0}
+    header{display:flex;align-items:center;gap:8px;padding:14px 16px;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0}
+    header img{height:24px}
+    .wrap{max-width:1100px;margin:18px auto;padding:0 16px;display:grid;grid-template-columns:360px 1fr;gap:18px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:0 4px 16px rgba(0,0,0,.04)}
+    h2{margin:0 0 12px 0;font-size:18px}
+    label{font-size:12px;opacity:.9}
+    input,textarea,select,button{font:inherit}
+    input,textarea,select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .btn{background:var(--btn);color:var(--btnfg);border:none;border-radius:10px;padding:10px 14px;cursor:pointer}
+    .muted{font-size:12px;color:var(--muted)}
+    .hidden{display:none !important}
+    details{margin-top:12px}
+    details>summary{cursor:pointer;color:#444}
+    #toast{position:fixed;right:12px;bottom:12px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;display:none}
+  </style>
+</head>
+<body>
+<header>
+  <img src="/web/logo.png" alt="Foody"/><b>Foody — ЛК партнёра</b>
+  <div style="margin-left:auto"><button id="logout" class="btn">Выйти</button></div>
+</header>
+
 <div class="wrap">
-  <div class="row">
-    <div class="card" style="max-width:360px">
-      <div style="font-weight:600;margin-bottom:8px">Вход / Регистрация</div>
-      <div id="authBox">
-        <div id="loginBox">
-          <label>Restaurant ID</label>
-          <input id="rid" placeholder="RID_..." />
-          <label>API KEY</label>
-          <input id="key" placeholder="KEY_..." />
-          <div style="margin-top:10px"><button id="saveBtn">Войти</button></div>
-        </div>
-        <hr style="opacity:.1;margin:12px 0">
-        <div id="regBox">
-          <div style="opacity:.8;margin-bottom:6px">Нет аккаунта? Зарегистрируйте ресторан:</div>
-          <label>Название *</label><input id="r_title" placeholder="Название">
-          <label>Телефон</label><input id="r_phone" placeholder="+7 ...">
-          <label>Город</label><input id="r_city" placeholder="Город">
-          <label>Адрес</label><input id="r_addr" placeholder="Улица, дом">
-          <div style="margin:6px 0"><button id="r_geo">Определить гео</button></div>
-          <div id="map"></div>
-          <div style="margin-top:10px"><button id="r_reg">Зарегистрировать</button></div>
-        </div>
-      </div>
-      <div id="whoami" style="display:none">
-        <div style="opacity:.8;font-size:12px">Вы вошли как <span id="who_title"></span></div>
-      </div>
+  <div class="card" id="loginCard">
+    <h2>Вход / Регистрация</h2>
+
+    <!-- PHONE LOGIN (DEV RECOVER) -->
+    <div id="phoneLogin">
+      <label>Телефон</label>
+      <input id="loginPhone" placeholder="+7 ..." />
+      <label class="muted">Секрет (временно, для MVP)</label>
+      <input id="loginSecret" placeholder="RECOVERY_SECRET" />
+      <div style="margin-top:10px"><button class="btn" id="btnLogin">Войти</button></div>
+      <div class="muted" style="margin-top:8px">В проде заменим на вход по коду.</div>
     </div>
-    <div class="card" style="flex:2">
-      <div style="font-weight:600;margin-bottom:8px">Профиль</div>
-      <div class="row" style="gap:8px">
-        <div><label>Название *</label><input id="p_title" placeholder="Название"></div>
-        <div><label>Телефон</label><input id="p_phone" placeholder="+7 ..."></div>
-        <div><label>Город</label><input id="p_city" placeholder="Город"></div>
-        <div><label>Адрес</label><input id="p_addr" placeholder="Улица, дом"></div>
+
+    <hr style="margin:16px -16px;border:0;border-top:1px solid #eee"/>
+
+    <!-- SIMPLE REGISTRATION -->
+    <div id="reg">
+      <div class="row">
+        <div><label>Название *</label><input id="regTitle" placeholder="Кафе «Вкусно»"></div>
+        <div><label>Телефон</label><input id="regPhone" placeholder="+7 ..."></div>
       </div>
-      <div class="row" style="gap:8px;margin-top:8px">
-        <div><label>Широта (lat)</label><input id="p_lat" placeholder="55.75"></div>
-        <div><label>Долгота (lon)</label><input id="p_lon" placeholder="37.61"></div>
-        <div style="align-self:end"><button id="p_save">Сохранить профиль</button></div>
+      <div class="row" style="margin-top:8px">
+        <div><label>Город</label><input id="regCity" placeholder="Город"></div>
+        <div><label>Адрес</label><input id="regAddress" placeholder="Улица, дом"></div>
       </div>
-      <div style="opacity:.7;font-size:12px;margin-top:6px">* Точку можно поставить на карте при регистрации</div>
+      <div style="margin-top:8px"><button class="btn" id="btnGeo">Определить гео</button></div>
+      <div class="muted" style="margin-top:6px">Маркер можно уточнить на карте после регистрации.</div>
+      <div style="margin-top:10px"><button class="btn" id="btnRegister">Зарегистрировать</button></div>
+
+      <details>
+        <summary>Техвход (на случай, если /recover ещё не поднят)</summary>
+        <div class="row" style="margin-top:8px">
+          <div><label>RID</label><input id="rid"></div>
+          <div><label>KEY</label><input id="key"></div>
+        </div>
+        <div style="margin-top:10px"><button class="btn" id="btnTechLogin">Войти по RID/KEY</button></div>
+      </details>
     </div>
   </div>
-  <div class="card" style="margin-top:14px">
-    <div style="font-weight:600;margin-bottom:8px">Создать оффер</div>
-    <div class="row" style="gap:8px">
-      <div><label>Название *</label><input id="o_title" placeholder="Например, Набор эклеров"></div>
-      <div><label>Цена ₽ *</label><input id="o_price_rub" type="number" step="0.01" placeholder="199.00"></div>
-      <div><label>Старая цена ₽</label><input id="o_orig_rub" type="number" step="0.01" placeholder="349.00"></div>
-      <div><label>Количество *</label><input id="o_qty" type="number" step="1" placeholder="5"></div>
-      <div><label>Истекает (местное время)</label><input id="o_exp_local" type="datetime-local"></div>
-      <div><label>Фото</label><input type="file" id="o_photo_file" accept="image/*"><div><button id="o_upload_btn" type="button">Загрузить фото →</button></div><input id="o_photo" type="hidden"></div>
-      <div style="align-self:end"><button id="o_btn">Создать</button></div>
+
+  <div class="card" id="profileCard">
+    <h2>Профиль</h2>
+    <div class="row">
+      <div><label>Название *</label><input id="pTitle" placeholder="Название"></div>
+      <div><label>Телефон</label><input id="pPhone" placeholder="+7 ..."></div>
     </div>
-  </div>
-  <div class="card" style="margin-top:14px">
-    <div style="font-weight:600;margin-bottom:8px">Мои офферы</div>
-    <div id="offers" class="grid"></div>
+    <div class="row" style="margin-top:8px">
+      <div><label>Адрес</label><input id="pAddress" placeholder="Улица, дом"></></div>
+      <div><label>Город</label><input id="pCity" placeholder="Город"></div>
+    </div>
+    <!-- lat/lon скрыты из UI; значения берём из гео или профиля -->
+    <div class="row hidden" id="latlonRow" style="margin-top:8px">
+      <div><label>lat</label><input id="pLat"></div>
+      <div><label>lon</label><input id="pLon"></div>
+    </div>
+    <div style="margin-top:10px"><button class="btn" id="btnSaveProfile">Сохранить профиль</button></div>
   </div>
 </div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="" crossorigin=""></script>
+
+<div id="toast"></div>
+
 <script>
-function toast(msg){ const t=document.createElement('div'); t.textContent=msg; t.style.cssText='position:fixed;right:12px;bottom:12px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.2);z-index:9999'; document.body.appendChild(t); setTimeout(()=>t.remove(),2000); }
+const API = window.FOODY_API || '';
+function toast(s){ const t=document.getElementById('toast'); t.textContent=s; t.style.display='block'; setTimeout(()=>t.style.display='none',2200); }
+function saveAuth(rid,key){ localStorage.setItem('RID',rid); localStorage.setItem('KEY',key); }
+function auth(){ return {rid:localStorage.getItem('RID'), key:localStorage.getItem('KEY')} }
 
-const API=(window.foodyApi||'').replace(/\\/$/,'');
-const st={ get rid(){return localStorage.getItem('RID')||''}, set rid(v){localStorage.setItem('RID',v)},
-           get key(){return localStorage.getItem('KEY')||''}, set key(v){localStorage.setItem('KEY',v)} };
-function $(id){return document.getElementById(id)}
-function money(c){return (c/100).toLocaleString('ru-RU',{style:'currency',currency:'RUB'})}
-function auth(){return {'X-Foody-Key': st.key}}
-function toUTC(yyyyMmDdThhMm){ if(!yyyyMmDdThhMm) return null; const d=new Date(yyyyMmDdThhMm); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().replace(/\\.\\d{3}Z$/,'Z'); }
+// Login via /merchant/recover (dev)
+document.getElementById('btnLogin').onclick = async ()=>{
+  const phone = document.getElementById('loginPhone').value.trim();
+  const secret = document.getElementById('loginSecret').value.trim();
+  try{
+    const rs = await fetch(API+'/api/v1/merchant/recover', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,secret})});
+    if(!rs.ok){ const t=await rs.text(); throw new Error('Ошибка входа: '+t); }
+    const j = await rs.json();
+    saveAuth(j.restaurant_id, j.api_key);
+    toast('Вход выполнен'); location.reload();
+  }catch(e){ toast(e.message); }
+};
 
-// Map helpers for registration
-let map, marker;
-function initMap(lat=55.751244, lon=37.618423){
-  if(map){ map.setView([lat,lon], 13); if(marker){marker.setLatLng([lat,lon]);} return; }
-  map = L.map('map').setView([lat, lon], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap'}).addTo(map);
-  marker = L.marker([lat,lon], {draggable:true}).addTo(map);
-  marker.on('dragend', ()=>{
-    const p = marker.getLatLng();
-    document.getElementById('p_lat').value = p.lat.toFixed(6);
-    document.getElementById('p_lon').value = p.lng.toFixed(6);
-  });
-}
-document.getElementById('r_geo').onclick = ()=>{
-  if(navigator.geolocation){
-    navigator.geolocation.getCurrentPosition(pos=>{
-      const {latitude, longitude}=pos.coords;
-      document.getElementById('p_lat').value=latitude.toFixed(6);
-      document.getElementById('p_lon').value=longitude.toFixed(6);
-      initMap(latitude, longitude);
-    }, ()=>initMap());
-  } else {
-    initMap();
+// Tech login (fallback)
+document.getElementById('btnTechLogin').onclick = ()=>{
+  const rid=document.getElementById('rid').value.trim();
+  const key=document.getElementById('key').value.trim();
+  if(!rid||!key){ return toast('Укажите RID и KEY'); }
+  saveAuth(rid,key); toast('Вход выполнен'); location.reload();
+};
+
+// Register
+document.getElementById('btnRegister').onclick = async ()=>{
+  const title=document.getElementById('regTitle').value.trim();
+  const phone=document.getElementById('regPhone').value.trim();
+  const city=document.getElementById('regCity').value.trim();
+  const address=document.getElementById('regAddress').value.trim();
+  try{
+    const rs=await fetch(API+'/api/v1/merchant/register_public',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,phone,city,address})});
+    if(!rs.ok){ const t=await rs.text(); throw new Error('Регистрация не удалась: '+t); }
+    const j=await rs.json(); saveAuth(j.restaurant_id, j.api_key);
+    toast('Готово, вы вошли'); location.reload();
+  }catch(e){ toast(e.message); }
+};
+
+// Geo button
+document.getElementById('btnGeo').onclick = ()=>{
+  if(!navigator.geolocation){ return toast('Гео недоступно'); }
+  navigator.geolocation.getCurrentPosition(pos=>{
+    localStorage.setItem('GEO_LAT', pos.coords.latitude);
+    localStorage.setItem('GEO_LON', pos.coords.longitude);
+    toast('Гео сохранено');
+  }, ()=> toast('Нет доступа к гео'));
+};
+
+// Save profile (uses auth RID/KEY from storage)
+document.getElementById('btnSaveProfile').onclick = async ()=>{
+  const {rid,key}=auth(); if(!rid||!key){ return toast('Сначала войдите'); }
+  const title=document.getElementById('pTitle').value.trim();
+  const phone=document.getElementById('pPhone').value.trim();
+  const address=document.getElementById('pAddress').value.trim();
+  const city=document.getElementById('pCity').value.trim();
+  const lat = localStorage.getItem('GEO_LAT') || document.getElementById('pLat').value;
+  const lon = localStorage.getItem('GEO_LON') || document.getElementById('pLon').value;
+  try{
+    const body={ restaurant_id:rid, title, phone, address, city, lat, lon };
+    const rs=await fetch(API+'/api/v1/merchant/profile',{method:'POST',headers:{'Content-Type':'application/json','X-Foody-Key':key},body:JSON.stringify(body)});
+    if(!rs.ok){ const t=await rs.text(); throw new Error('Не сохранилось: '+t); }
+    toast('Профиль сохранён');
+  }catch(e){ toast(e.message); }
+};
+
+// Logout
+document.getElementById('logout').onclick = ()=>{ localStorage.removeItem('RID'); localStorage.removeItem('KEY'); location.reload(); };
+
+// On load: hide login if token exists
+(function init(){
+  const {rid,key}=auth();
+  if(rid && key){
+    document.getElementById('loginCard').classList.add('hidden');
   }
-};
-
-// Auth flow
-async function loadProfile(){
-  if(!st.rid||!st.key){$('authBox').style.display='block';$('whoami').style.display='none'; return;}
-  const r=await fetch(API+'/api/v1/merchant/profile?restaurant_id='+encodeURIComponent(st.rid),{headers:auth()});
-  if(!r.ok){$('authBox').style.display='block';$('whoami').style.display='none'; return;}
-  const p=await r.json();
-  $('authBox').style.display='none';$('whoami').style.display='block';
-  $('who_title').textContent=p.title||'';
-  $('p_title').value=p.title||''; $('p_phone').value=p.phone||''; $('p_city').value=p.city||''; $('p_addr').value=p.address||'';
-  $('p_lat').value=p.lat??''; $('p_lon').value=p.lon??'';
-  loadOffers();
-}
-document.getElementById('saveBtn').onclick=()=>{st.rid=$('rid').value.trim();st.key=$('key').value.trim();loadProfile();};
-document.getElementById('logout').onclick=()=>{localStorage.removeItem('RID');localStorage.removeItem('KEY');location.href='/web/merchant/'};
-document.getElementById('r_reg').onclick=async ()=>{
-  const body={title:$('r_title').value.trim(),phone:$('r_phone').value.trim(),city:$('r_city').value.trim(),
-              address:$('r_addr').value.trim(),lat:$('p_lat').value,lon:$('p_lon').value};
-  const rr=await fetch(API+'/api/v1/merchant/register_public',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  const data=await rr.json(); if(!rr.ok){alert(data.detail||'Ошибка'); return;}
-  st.rid = data.restaurant_id; st.key = data.api_key; loadProfile();
-};
-document.getElementById('p_save').onclick=async ()=>{
-  const body={restaurant_id:st.rid,title:$('p_title').value.trim(),phone:$('p_phone').value.trim(),
-              city:$('p_city').value.trim(),address:$('p_addr').value.trim(),lat:$('p_lat').value,lon:$('p_lon').value};
-  await fetch(API+'/api/v1/merchant/profile',{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify(body)});
-  loadProfile();
-};
-
-// Upload via presigned PUT to R2
-async function uploadPhoto(file){
-  if(!file){ alert('Файл не выбран'); return null; }
-  const ps = await fetch(API + '/api/v1/uploads/presign', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({filename:file.name, content_type:file.type||'application/octet-stream'})});
-  const cfg = await ps.json(); if(!ps.ok){ toast('Ошибка пресайна: '+ ' + (cfg.detail||cfg.error||ps.status)); return null; }
-  const put = await fetch(cfg.put_url, {method:'PUT', headers:{'Content-Type': file.type||'application/octet-stream'}, body:file});
-  if(!put.ok){ alert('Не удалось загрузить файл'); return null; }
-  return cfg.public_url;
-}
-document.getElementById('o_upload_btn').onclick = async ()=>{
-  const f = document.getElementById('o_photo_file').files[0];
-  const url = await uploadPhoto(f);
-  if(url){ document.getElementById('o_photo').value = url; toast('Фото загружено') }
-};
-
-// Offers CRUD
-document.getElementById('o_btn').onclick=async ()=>{
-  const body={restaurant_id:st.rid,title:$('o_title').value.trim(),price:parseFloat($('o_price_rub').value||'0'),
-              original_price:parseFloat($('o_orig_rub').value||'0')||null,qty_total:parseInt($('o_qty').value||'0',10),
-              qty_left:parseInt($('o_qty').value||'0',10),expires_at:(function(){const v=document.getElementById('o_exp_local').value; if(!v) return null; const d=new Date(v); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().replace(/\\.\\d{3}Z$/,'Z');})(),
-              photo_url:document.getElementById('o_photo').value.trim()||null};
-  await fetch(API+'/api/v1/merchant/offers',{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify(body)});
-  loadOffers();
-};
-async function loadOffers(){
-  const r=await fetch(API+'/api/v1/merchant/offers?restaurant_id='+encodeURIComponent(st.rid)+'&status=active',{headers:auth()});
-  const arr=await r.json(); const el=document.getElementById('offers'); el.innerHTML='';
-  for(const it of arr){
-    const d=document.createElement('div'); d.className='card';
-    const img = it.photo_url ? '<img class="photo" src="'+it.photo_url+'">' : '';
-    d.innerHTML = img + '<div class="title">'+(it.title||'')+'</div>' +
-      '<div>'+money(it.price_cents)+(it.original_price_cents?'<span class="strike">'+money(it.original_price_cents)+'</span>':'')+'</div>'+
-      '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">' +
-      '<button data-id="'+it.id+'" class="edit">Редактировать</button>'+
-      '<button data-id="'+it.id+'" class="del">Удалить</button>'+
-      '<button data-id="'+it.id+'" class="clrphoto">Убрать фото</button>'+
-      '</div>';
-    d.querySelector('.del').onclick=async(ev)=>{const id=ev.target.getAttribute('data-id');await fetch(API+'/api/v1/merchant/offers/'+id+'?restaurant_id='+encodeURIComponent(st.rid),{method:'DELETE',headers:auth()});loadOffers();};
-    d.querySelector('.clrphoto').onclick=async(ev)=>{const id=ev.target.getAttribute('data-id');await fetch(API+'/api/v1/merchant/offers/'+id,{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify({restaurant_id:st.rid,photo_url:null})});loadOffers();};
-    d.querySelector('.edit').onclick=async(ev)=>{
-      const id=ev.target.getAttribute('data-id');
-      // one-window edit dialog via prompt set
-      const title=prompt('Название', it.title||'')??it.title;
-      const priceStr=prompt('Цена ₽', (it.price_cents/100).toString());
-      const price= priceStr==null ? (it.price_cents/100) : parseFloat(priceStr||'0');
-      const origStr=prompt('Старая цена ₽ (пусто если нет)', it.original_price_cents? (it.original_price_cents/100).toString() : '');
-      const orig = origStr===null ? (it.original_price_cents? (it.original_price_cents/100) : null) : (origStr?parseFloat(origStr):null);
-      const dtl=prompt('Время истечения (локальное, yyyy-mm-ddThh:mm)', it.expires_at? new Date(it.expires_at).toISOString().slice(0,16): '' );
-      const expires= dtl? (function(){const d=new Date(dtl); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().replace(/\\.\\d{3}Z$/,'Z');})() : it.expires_at;
-      const body={restaurant_id:st.rid,title,price,original_price:orig,expires_at:expires};
-      await fetch(API+'/api/v1/merchant/offers/'+id,{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify(body)});
-      loadOffers();
-    };
-    el.appendChild(d);
-  }
-}
-window.addEventListener('load',()=>{$('rid').value=st.rid;$('key').value=st.key;loadProfile();initMap();});
+  // Hide lat/lon row
+  document.getElementById('latlonRow').classList.add('hidden');
+})();
 </script>
-
-<!-- FOODY_BUILD_VERSION: nocache-1755133858 -->
-
-<!-- FOODY_BUILD_VERSION: plus7-1755134211 -->
-
-<!-- FOODY_BUILD_VERSION: canvas-1755135041 -->
+</body>
+</html>
