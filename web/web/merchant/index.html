@@ -1,5 +1,5 @@
 <!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Foody — ЛК</title><script src="/config.js"></script>
+<title>Foody — ЛК (обновлено)</title><script src="/config.js"></script>
 <style>
  body{font-family:Inter,system-ui,Arial,sans-serif;margin:0;background:#0b0c10;color:#eee}
  header{padding:12px 16px;background:#111;border-bottom:1px solid #222;display:flex;gap:10px;align-items:center}
@@ -8,10 +8,12 @@
  .card{flex:1;min-width:280px;background:#14161a;border:1px solid #1f232a;border-radius:14px;padding:14px}
  input,button{font:inherit;border-radius:10px;border:1px solid #2a2f38;background:#0f1115;color:#eee;padding:8px 10px}
  button{cursor:pointer}
+ label{display:block;font-size:12px;opacity:.8;margin:4px 0 6px}
  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
  .title{font-weight:600;margin:0 0 6px}
  .photo{width:100%;height:140px;background:#0f1115;border:1px solid #2a2f38;border-radius:10px;object-fit:cover;margin-bottom:8px}
  .strike{opacity:.6;text-decoration:line-through;margin-left:8px;font-size:14px}
+ details{margin-top:8px}
 </style>
 <header>
   <div><b>Foody</b> — ЛК партнёра</div>
@@ -22,35 +24,47 @@
     <div class="card" style="max-width:330px">
       <div style="font-weight:600;margin-bottom:8px">Вход</div>
       <div id="loginBox">
-        <input id="rid" placeholder="RID_..." /><br><br>
-        <input id="key" placeholder="KEY_..." /><br><br>
-        <button id="saveBtn">Сохранить</button>
+        <label>Restaurant ID</label>
+        <input id="rid" placeholder="RID_..." />
+        <label>API KEY</label>
+        <input id="key" placeholder="KEY_..." />
+        <div style="margin-top:10px"><button id="saveBtn">Войти</button></div>
+        <div style="opacity:.7;font-size:12px;margin-top:8px">* Данные сохранятся на этом устройстве</div>
       </div>
-      <div id="whoami" style="display:none"></div>
+      <div id="whoami" style="display:none">
+        <div style="opacity:.8;font-size:12px">Вы вошли как <span id="who_title"></span></div>
+        <details style="opacity:.8"><summary>Показать RID/KEY</summary>
+          <div style="margin-top:6px;word-break:break-all"><b>RID:</b> <span id="who_rid"></span><br><b>KEY:</b> <span id="who_key"></span></div>
+        </details>
+      </div>
     </div>
     <div class="card" style="flex:2">
       <div style="font-weight:600;margin-bottom:8px">Профиль</div>
       <div class="row" style="gap:8px">
-        <input id="p_title" placeholder="Название *" style="min-width:220px">
-        <input id="p_phone" placeholder="Телефон">
-        <input id="p_city" placeholder="Город">
-        <input id="p_addr" placeholder="Адрес">
-        <input id="p_lat" placeholder="lat">
-        <input id="p_lon" placeholder="lon">
-        <button id="p_save">Сохранить</button>
+        <div><label>Название *</label><input id="p_title" placeholder="Название"></div>
+        <div><label>Телефон</label><input id="p_phone" placeholder="+7 ..."></div>
+        <div><label>Город</label><input id="p_city" placeholder="Город"></div>
+        <div><label>Адрес</label><input id="p_addr" placeholder="Улица, дом"></div>
       </div>
+      <details><summary>Расширенные (гео)</summary>
+        <div class="row" style="gap:8px;margin-top:8px">
+          <div><label>Широта (lat)</label><input id="p_lat" placeholder="55.75"></div>
+          <div><label>Долгота (lon)</label><input id="p_lon" placeholder="37.61"></div>
+        </div>
+      </details>
+      <div style="margin-top:10px"><button id="p_save">Сохранить профиль</button></div>
     </div>
   </div>
   <div class="card" style="margin-top:14px">
     <div style="font-weight:600;margin-bottom:8px">Создать оффер</div>
     <div class="row" style="gap:8px">
-      <input id="o_title" placeholder="Название *">
-      <input id="o_price_rub" placeholder="Цена ₽ *">
-      <input id="o_orig_rub" placeholder="Старая цена ₽">
-      <input id="o_qty" placeholder="Кол-во *">
-      <input id="o_exp" placeholder="ISO время истечения (UTC)">
-      <input id="o_photo" placeholder="Фото URL (опц.)">
-      <button id="o_btn">Создать</button>
+      <div><label>Название *</label><input id="o_title" placeholder="Например, Набор эклеров"></div>
+      <div><label>Цена ₽ *</label><input id="o_price_rub" type="number" step="0.01" placeholder="199.00"></div>
+      <div><label>Старая цена ₽</label><input id="o_orig_rub" type="number" step="0.01" placeholder="349.00"></div>
+      <div><label>Количество *</label><input id="o_qty" type="number" step="1" placeholder="5"></div>
+      <div><label>Истекает (местное время)</label><input id="o_exp_local" type="datetime-local"></div>
+      <div><label>Фото URL</label><input id="o_photo" placeholder="https://..."></div>
+      <div style="align-self:end"><button id="o_btn">Создать</button></div>
     </div>
   </div>
   <div class="card" style="margin-top:14px">
@@ -65,13 +79,14 @@ const st={ get rid(){return localStorage.getItem('RID')||''}, set rid(v){localSt
 function $(id){return document.getElementById(id)}
 function money(c){return (c/100).toLocaleString('ru-RU',{style:'currency',currency:'RUB'})}
 function auth(){return {'X-Foody-Key': st.key}}
+function toUTC(yyyyMmDdThhMm){ if(!yyyyMmDdThhMm) return null; const d=new Date(yyyyMmDdThhMm); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().replace(/\.\d{3}Z$/,'Z'); }
 async function loadProfile(){
   if(!st.rid||!st.key){$('loginBox').style.display='block';$('whoami').style.display='none';return;}
   const r=await fetch(API+'/api/v1/merchant/profile?restaurant_id='+encodeURIComponent(st.rid),{headers:auth()});
   if(!r.ok){$('loginBox').style.display='block';$('whoami').style.display='none';return;}
   const p=await r.json();
   $('loginBox').style.display='none';$('whoami').style.display='block';
-  $('whoami').innerHTML='<div><b>RID:</b> '+st.rid+'<br><b>KEY:</b> '+st.key+'<br><b>Название:</b> '+(p.title||'')+'</div>';
+  $('who_title').textContent=p.title||''; $('who_rid').textContent=st.rid; $('who_key').textContent=st.key;
   $('p_title').value=p.title||''; $('p_phone').value=p.phone||''; $('p_city').value=p.city||''; $('p_addr').value=p.address||'';
   $('p_lat').value=p.lat??''; $('p_lon').value=p.lon??'';
   loadOffers();
@@ -86,7 +101,7 @@ $('p_save').onclick=async ()=>{
 $('o_btn').onclick=async ()=>{
   const body={restaurant_id:st.rid,title:$('o_title').value.trim(),price:parseFloat($('o_price_rub').value||'0'),
               original_price:parseFloat($('o_orig_rub').value||'0')||null,qty_total:parseInt($('o_qty').value||'0',10),
-              qty_left:parseInt($('o_qty').value||'0',10),expires_at:$('o_exp').value.trim()||null,photo_url:$('o_photo').value.trim()||null};
+              qty_left:parseInt($('o_qty').value||'0',10),expires_at:toUTC($('o_exp_local').value)||null,photo_url:$('o_photo').value.trim()||null};
   await fetch(API+'/api/v1/merchant/offers',{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify(body)});
   loadOffers();
 };
@@ -110,7 +125,8 @@ async function loadOffers(){
       const title=prompt('Название', it.title||'')||it.title;
       const price=parseFloat(prompt('Цена ₽', (it.price_cents/100).toString())|| (it.price_cents/100));
       const orig=prompt('Старая цена ₽ (пусто если нет)', it.original_price_cents? (it.original_price_cents/100).toString() : '')||'';
-      const expires=prompt('ISO время истечения (UTC)', it.expires_at||'')||it.expires_at;
+      const dtl=prompt('Время истечения (локальное, yyyy-mm-ddThh:mm)', it.expires_at? new Date(it.expires_at).toISOString().slice(0,16): '' )||'';
+      const expires= toUTC(dtl) || it.expires_at;
       const photo=prompt('Фото URL (пусто чтобы оставить как есть)', it.photo_url||'')||it.photo_url;
       const body={restaurant_id:st.rid,title,price,original_price:(orig?parseFloat(orig):null),expires_at:expires,photo_url:photo};
       await fetch(API+'/api/v1/merchant/offers/'+id,{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify(body)});
