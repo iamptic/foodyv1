@@ -1,4 +1,5 @@
-<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<!doctype html><meta charset="utf-8"><link rel="icon" href="/web/favicon.png"/>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Foody — ЛК партнёра</title><script src="/config.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="" crossorigin=""/>
 <style>
@@ -26,7 +27,7 @@
   <div style="margin-left:auto;display:flex;gap:8px">
     <button id="logout">Выйти</button>
   </div>
-</header>
+<div style="margin-left:auto;font-size:12px;opacity:.6">v:nocache-1755133858</div></header>
 <div class="wrap">
   <div class="row">
     <div class="card" style="max-width:360px">
@@ -90,6 +91,8 @@
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="" crossorigin=""></script>
 <script>
+function toast(msg){ const t=document.createElement('div'); t.textContent=msg; t.style.cssText='position:fixed;right:12px;bottom:12px;background:#111;color:#fff;padding:10px 12px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.2);z-index:9999'; document.body.appendChild(t); setTimeout(()=>t.remove(),2000); }
+
 const API=(window.foodyApi||'').replace(/\\/$/,'');
 const st={ get rid(){return localStorage.getItem('RID')||''}, set rid(v){localStorage.setItem('RID',v)},
            get key(){return localStorage.getItem('KEY')||''}, set key(v){localStorage.setItem('KEY',v)} };
@@ -156,7 +159,7 @@ document.getElementById('p_save').onclick=async ()=>{
 async function uploadPhoto(file){
   if(!file){ alert('Файл не выбран'); return null; }
   const ps = await fetch(API + '/api/v1/uploads/presign', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({filename:file.name, content_type:file.type||'application/octet-stream'})});
-  const cfg = await ps.json(); if(!ps.ok){ alert('Не удалось получить ссылку загрузки: ' + (cfg.detail||cfg.error||ps.status)); return null; }
+  const cfg = await ps.json(); if(!ps.ok){ toast('Ошибка пресайна: '+ ' + (cfg.detail||cfg.error||ps.status)); return null; }
   const put = await fetch(cfg.put_url, {method:'PUT', headers:{'Content-Type': file.type||'application/octet-stream'}, body:file});
   if(!put.ok){ alert('Не удалось загрузить файл'); return null; }
   return cfg.public_url;
@@ -164,7 +167,7 @@ async function uploadPhoto(file){
 document.getElementById('o_upload_btn').onclick = async ()=>{
   const f = document.getElementById('o_photo_file').files[0];
   const url = await uploadPhoto(f);
-  if(url){ document.getElementById('o_photo').value = url; alert('Фото загружено'); }
+  if(url){ document.getElementById('o_photo').value = url; toast('Фото загружено') }
 };
 
 // Offers CRUD
@@ -210,3 +213,9 @@ async function loadOffers(){
 }
 window.addEventListener('load',()=>{$('rid').value=st.rid;$('key').value=st.key;loadProfile();initMap();});
 </script>
+
+<!-- FOODY_BUILD_VERSION: nocache-1755133858 -->
+
+<!-- FOODY_BUILD_VERSION: plus7-1755134211 -->
+
+<!-- FOODY_BUILD_VERSION: canvas-1755135041 -->

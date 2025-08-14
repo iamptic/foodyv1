@@ -1,5 +1,8 @@
-<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<!doctype html><meta charset="utf-8"><link rel="icon" href="/web/favicon.png"/>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Foody — Витрина</title><script src="/config.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="" crossorigin=""/>
 <style>
  body{font-family:Inter,system-ui,Arial,sans-serif;margin:0;background:#f7f7f9;color:#111}
@@ -36,9 +39,10 @@
     <input id="qty" type="number" min="1" step="1" value="1" class="pill" style="width:70px" title="Сколько бронировать">
     <button id="geoBtn">Гео</button>
     <button id="myRes">Мои брони</button>
-  </div>
-</header>
+   <button id="toggleMap">Карта</button></div>
+<div style="margin-left:auto;font-size:12px;opacity:.6">v:nocache-1755133858</div></header>
 <div class="wrap">
+  <div id="mapwrap" style="display:none;margin-bottom:12px"><div id="map" style="height:360px;border:1px solid #e5e7eb;border-radius:10px"></div></div>
   <div id="list" class="grid"></div>
   <div id="empty" class="empty" style="display:none">Пока нет активных офферов</div>
 </div>
@@ -47,6 +51,47 @@
 <script>
 const API=(window.foodyApi||'').replace(/\\/$/,'');
 let GEO=null;
+
+// --- map + countdown + share ---
+let MAP=null, LAYER=null;
+function initMap(center){ if(MAP) return; MAP=L.map('map').setView(center||[55.751244,37.618423], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap'}).addTo(MAP);
+  LAYER = L.layerGroup().addTo(MAP);
+}
+function renderMarkers(items){
+  if(!MAP||!LAYER) return;
+  LAYER.clearLayers();
+  let any=false;
+  for(const it of items){
+    if(it.rest_lat!=null && it.rest_lon!=null){
+      const m=L.marker([it.rest_lat, it.rest_lon]).addTo(LAYER);
+      const price=money(it.price_cents_effective ?? it.price_cents);
+      const expires=it.expires_at ? new Date(it.expires_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) : '—';
+      const html = `<b>${esc(it.title||'')}</b><br/>${price}<br/>До: ${expires}<br/><a href='#' data-id='${it.id}' class='goReserve'>Забронировать</a>`;
+      m.bindPopup(html);
+      any=true;
+    }
+  }
+  if(any){ try{ MAP.fitBounds(LAYER.getBounds(), {padding:[20,20]}); }catch{} }
+}
+function countdown(dtISO){
+  if(!dtISO) return '';
+  const end = new Date(dtISO).getTime();
+  const now = Date.now();
+  let s = Math.max(0, Math.floor((end-now)/1000));
+  const h = Math.floor(s/3600); s%=3600;
+  const m = Math.floor(s/60); s%=60;
+  return (h? (h+'ч '):'') + (m+'м ') + (s+'с');
+}
+function shareOffer(it){
+  const url = location.origin + '/web/buyer/?offer='+encodeURIComponent(it.id);
+  const text = `${it.title} — ${money(it.price_cents_effective ?? it.price_cents)}`;
+  if (navigator.share){ navigator.share({title:'Foody', text, url}).catch(()=>{}); }
+  else {
+    navigator.clipboard.writeText(url).then(()=> alert('Ссылка скопирована'));
+  }
+}
+
 const store={
   get res(){ try{return JSON.parse(localStorage.getItem('RESV')||'[]')}catch{return[]} },
   set res(v){ localStorage.setItem('RESV', JSON.stringify(v.slice(-100))); } // keep last 100
@@ -70,8 +115,9 @@ function card(it){
   const el=document.createElement('div'); el.className='card';
   el.innerHTML = img + `<div class="title">${esc(it.title||'Без названия')}</div>
     <div class="price">${price}${orig}${badge}</div>
-    <div class="sub">До: ${esc(expires)} • Остаток: ${it.qty_left ?? 0}${dist}</div>
-    <div style="margin-top:10px"><button data-id="${it.id}" class="reserve">Забронировать</button></div>`;
+    <div class="sub">До: <span class='cd' data-expires='${it.expires_at||''}'></span> • Остаток: ${it.qty_left ?? 0}${dist}</div>
+    <div style="margin-top:10px;display:flex;gap:8px"><button data-id="${it.id}" class="reserve">Забронировать</button><button class="share">Поделиться</button></div>`;
+  el.querySelector('.share').onclick = ()=> shareOffer(it);
   el.querySelector('.reserve').onclick = async ()=>{
     const qty = Math.max(1, parseInt($('qty').value||'1',10));
     try{
@@ -93,6 +139,11 @@ function render(items){
   const list=$('list'), empty=$('empty'); list.innerHTML='';
   if(!items.length){ empty.style.display='block'; return; } empty.style.display='none';
   for(const it of items){ list.appendChild(card(it)); }
+  // countdown refresh
+  const upd=()=>{ document.querySelectorAll('.cd').forEach(span=>{ span.textContent = countdown(span.getAttribute('data-expires')); }); };
+  upd(); if(window._cdTimer) clearInterval(window._cdTimer); window._cdTimer=setInterval(upd,1000);
+  // map markers
+  renderMarkers(items);
 }
 $('sort').onchange=fetchOffers;
 $('geoBtn').onclick=()=>{
@@ -134,5 +185,20 @@ $('myRes').onclick=()=>{
   $('history').style.display='flex';
 };
 $('closeHist').onclick=()=>{$('history').style.display='none';};
+document.getElementById('toggleMap').onclick=()=>{
+  const mw=$('mapwrap'); mw.style.display = (mw.style.display==='none'||!mw.style.display)?'block':'none';
+  if(mw.style.display==='block'){ initMap(GEO? [GEO.lat, GEO.lon] : [55.751244,37.618423]); renderMarkers(window._lastOffers||[]); }
+};
+const _oldFetchOffers = fetchOffers;
+fetchOffers = async function(){
+  const params=new URLSearchParams(); params.set('sort', $('sort').value); if(GEO){ params.set('lat', GEO.lat); params.set('lon', GEO.lon); }
+  const r=await fetch(API+'/api/v1/offers?'+params.toString()); const data=await r.json(); window._lastOffers = data || []; render(window._lastOffers);
+}
 fetchOffers();
 </script>
+
+<!-- FOODY_BUILD_VERSION: nocache-1755133858 -->
+
+<!-- FOODY_BUILD_VERSION: plus7-1755134211 -->
+
+<!-- FOODY_BUILD_VERSION: canvas-1755135041 -->

@@ -534,3 +534,10 @@ async def merchant_recover(body: Dict[str, Any] = Body(...)):
         if not r:
             raise HTTPException(404, "Not found")
         return {"restaurant_id": r["id"], "api_key": r["api_key"], "title": r["title"]}
+
+
+@app.post('/internal/notify')
+async def internal_notify(body: Dict[str, Any] = Body(...)):
+    # Placeholder: accept notifications from backend to bot or elsewhere.
+    # For MVP this is a no-op, just logs input and returns ok.
+    return {'ok': True}
