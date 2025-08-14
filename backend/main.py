@@ -257,6 +257,8 @@ async def delete_offer(offer_id: str, restaurant_id: Optional[str] = None, x_foo
         await conn.execute("UPDATE foody_offers SET archived_at=NOW() WHERE id=$1", offer_id)
         return {"ok": True, "deleted": offer_id}
 
+
+
 # ---- Offers public with sorting and discount ----
 
 def with_timer_discount(r: Dict[str, Any]) -> Dict[str, Any]:
@@ -420,6 +422,24 @@ async def cancel_reservation(body: Dict[str, Any] = Body(...)):
             await conn.execute("UPDATE foody_reservations SET status='canceled' WHERE id=$1", res["id"])
             await conn.execute("UPDATE foody_offers SET qty_left=qty_left+$1 WHERE id=$2", res["qty"], res["oid"])
         return {"ok": True, "status": "canceled"}
+
+# === DEV-ONLY merchant recovery by phone (guarded by RECOVERY_SECRET) ===
+@app.post("/api/v1/merchant/recover")
+async def merchant_recover(body: Dict[str, Any] = Body(...)):
+    secret = os.getenv("RECOVERY_SECRET", "")
+    if not secret:
+        raise HTTPException(503, "Recovery is not enabled")
+    if (body.get("secret") or "") != secret:
+        raise HTTPException(403, "Forbidden")
+    phone = (body.get("phone") or "").strip()
+    if not phone:
+        raise HTTPException(422, "phone required")
+    p = await pool()
+    async with p.acquire() as conn:
+        r = await conn.fetchrow("SELECT id, api_key, title FROM foody_restaurants WHERE phone=$1 ORDER BY created_at DESC LIMIT 1", phone)
+        if not r:
+            raise HTTPException(404, "Not found")
+        return {"restaurant_id": r["id"], "api_key": r["api_key"], "title": r["title"]}
 
 
 # ---- KPI stub ----
