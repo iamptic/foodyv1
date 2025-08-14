@@ -1,6 +1,6 @@
 <!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Foody — ЛК партнёра</title><script src="/config.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="" crossorigin=""/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <style>
  body{font-family:Inter,system-ui,Arial,sans-serif;margin:0;background:#0b0c10;color:#eee}
  header{padding:12px 16px;background:#111;border-bottom:1px solid #222;display:flex;gap:10px;align-items:center}
@@ -17,36 +17,35 @@
  .tabs a{padding:6px 10px;border-radius:10px;border:1px solid #2a2f38;text-decoration:none;color:#ddd}
  .tabs{display:flex;gap:8px}
  #map{height:220px;border:1px solid #2a2f38;border-radius:10px}
+ .hint{opacity:.75;font-size:12px}
 </style>
 <header>
   <div class="tabs">
     <a href="/web/buyer/">Витрина</a>
     <a href="/web/merchant/">ЛК партнёра</a>
   </div>
-  <div style="margin-left:auto;display:flex;gap:8px">
-    <button id="logout">Выйти</button>
-  </div>
+  <div style="margin-left:auto;display:flex;gap:8px"><button id="logout" style="display:none">Выйти</button></div>
 </header>
 <div class="wrap">
   <div class="row">
     <div class="card" style="max-width:360px">
-      <div style="font-weight:600;margin-bottom:8px">Вход / Регистрация</div>
-      <div id="authBox">
-        <div id="loginBox">
-          <label>Restaurant ID</label>
-          <input id="rid" placeholder="RID_..." />
-          <label>API KEY</label>
-          <input id="key" placeholder="KEY_..." />
-          <div style="margin-top:10px"><button id="saveBtn">Войти</button></div>
+      <div style="font-weight:600;margin-bottom:8px">Доступ в ЛК</div>
+      <div id="authArea">
+        <div id="phoneLogin">
+          <div class="hint">У вас уже есть карточка ресторана? Войти по телефону:</div>
+          <label>Телефон</label><input id="login_phone" placeholder="+7 ...">
+          <label>DEV-пароль</label><input id="login_secret" placeholder="секрет для доступа">
+          <div style="margin-top:8px"><button id="phone_login_btn">Войти</button></div>
+          <div class="hint" style="margin-top:6px">* В проде здесь будет вход по коду в Telegram/SMS. Сейчас — быстрый доступ для MVP.</div>
         </div>
         <hr style="opacity:.1;margin:12px 0">
         <div id="regBox">
-          <div style="opacity:.8;margin-bottom:6px">Нет аккаунта? Зарегистрируйте ресторан:</div>
+          <div style="font-weight:600;margin-bottom:6px">Регистрация ресторана</div>
           <label>Название *</label><input id="r_title" placeholder="Название">
           <label>Телефон</label><input id="r_phone" placeholder="+7 ...">
           <label>Город</label><input id="r_city" placeholder="Город">
           <label>Адрес</label><input id="r_addr" placeholder="Улица, дом">
-          <div style="margin:6px 0"><button id="r_geo">Определить гео</button></div>
+          <div style="margin:6px 0;display:flex;gap:8px;align-items:center"><button id="r_geo">Определить гео</button><span class="hint">или поставьте маркер на карте</span></div>
           <div id="map"></div>
           <div style="margin-top:10px"><button id="r_reg">Зарегистрировать</button></div>
         </div>
@@ -68,7 +67,7 @@
         <div><label>Долгота (lon)</label><input id="p_lon" placeholder="37.61"></div>
         <div style="align-self:end"><button id="p_save">Сохранить профиль</button></div>
       </div>
-      <div style="opacity:.7;font-size:12px;margin-top:6px">* Точку можно поставить на карте при регистрации</div>
+      <div class="hint" style="margin-top:6px">* Точку можно поставить на карте при регистрации</div>
     </div>
   </div>
   <div class="card" style="margin-top:14px">
@@ -88,7 +87,7 @@
     <div id="offers" class="grid"></div>
   </div>
 </div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script>
 const API=(window.foodyApi||'').replace(/\\/$/,'');
 const st={ get rid(){return localStorage.getItem('RID')||''}, set rid(v){localStorage.setItem('RID',v)},
@@ -98,62 +97,76 @@ function money(c){return (c/100).toLocaleString('ru-RU',{style:'currency',curren
 function auth(){return {'X-Foody-Key': st.key}}
 function toUTC(yyyyMmDdThhMm){ if(!yyyyMmDdThhMm) return null; const d=new Date(yyyyMmDdThhMm); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().replace(/\\.\\d{3}Z$/,'Z'); }
 
-// Map helpers for registration
 let map, marker;
 function initMap(lat=55.751244, lon=37.618423){
+  const mEl=$('map'); if(!mEl) return;
   if(map){ map.setView([lat,lon], 13); if(marker){marker.setLatLng([lat,lon]);} return; }
   map = L.map('map').setView([lat, lon], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap'}).addTo(map);
   marker = L.marker([lat,lon], {draggable:true}).addTo(map);
   marker.on('dragend', ()=>{
     const p = marker.getLatLng();
-    document.getElementById('p_lat').value = p.lat.toFixed(6);
-    document.getElementById('p_lon').value = p.lng.toFixed(6);
+    $('p_lat').value = p.lat.toFixed(6);
+    $('p_lon').value = p.lng.toFixed(6);
   });
 }
-document.getElementById('r_geo').onclick = ()=>{
+function ensureApi(){
+  if(!API){ alert('FOODY_API не настроен в web-сервисе'); }
+}
+
+async function enterAs(rid, key){
+  st.rid = rid; st.key = key;
+  $('authArea').style.display='none'; $('whoami').style.display='block'; $('logout').style.display='inline-flex';
+  loadProfile();
+}
+
+async function loadProfile(){
+  if(!st.rid||!st.key){ return; }
+  try{
+    const r=await fetch(API+'/api/v1/merchant/profile?restaurant_id='+encodeURIComponent(st.rid),{headers:auth()});
+    if(!r.ok) throw 0;
+    const p=await r.json();
+    $('who_title').textContent=p.title||'';
+    $('p_title').value=p.title||''; $('p_phone').value=p.phone||''; $('p_city').value=p.city||''; $('p_addr').value=p.address||'';
+    $('p_lat').value=p.lat??''; $('p_lon').value=p.lon??'';
+    loadOffers();
+  }catch{ /* stay on auth area */ }
+}
+
+$('logout').onclick=()=>{localStorage.removeItem('RID');localStorage.removeItem('KEY'); location.reload();};
+$('r_geo').onclick=()=>{
   if(navigator.geolocation){
     navigator.geolocation.getCurrentPosition(pos=>{
       const {latitude, longitude}=pos.coords;
-      document.getElementById('p_lat').value=latitude.toFixed(6);
-      document.getElementById('p_lon').value=longitude.toFixed(6);
+      $('p_lat').value=latitude.toFixed(6);
+      $('p_lon').value=longitude.toFixed(6);
       initMap(latitude, longitude);
     }, ()=>initMap());
-  } else {
-    initMap();
-  }
+  } else { initMap(); }
 };
-
-// Auth flow
-async function loadProfile(){
-  if(!st.rid||!st.key){$('authBox').style.display='block';$('whoami').style.display='none'; return;}
-  const r=await fetch(API+'/api/v1/merchant/profile?restaurant_id='+encodeURIComponent(st.rid),{headers:auth()});
-  if(!r.ok){$('authBox').style.display='block';$('whoami').style.display='none'; return;}
-  const p=await r.json();
-  $('authBox').style.display='none';$('whoami').style.display='block';
-  $('who_title').textContent=p.title||'';
-  $('p_title').value=p.title||''; $('p_phone').value=p.phone||''; $('p_city').value=p.city||''; $('p_addr').value=p.address||'';
-  $('p_lat').value=p.lat??''; $('p_lon').value=p.lon??'';
-  loadOffers();
-}
-document.getElementById('saveBtn').onclick=()=>{st.rid=$('rid').value.trim();st.key=$('key').value.trim();loadProfile();};
-document.getElementById('logout').onclick=()=>{localStorage.removeItem('RID');localStorage.removeItem('KEY');location.href='/web/merchant/'};
-document.getElementById('r_reg').onclick=async ()=>{
+$('r_reg').onclick=async ()=>{
+  ensureApi();
   const body={title:$('r_title').value.trim(),phone:$('r_phone').value.trim(),city:$('r_city').value.trim(),
               address:$('r_addr').value.trim(),lat:$('p_lat').value,lon:$('p_lon').value};
   const rr=await fetch(API+'/api/v1/merchant/register_public',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  const data=await rr.json(); if(!rr.ok){alert(data.detail||'Ошибка'); return;}
-  st.rid = data.restaurant_id; st.key = data.api_key; loadProfile();
-};
-document.getElementById('p_save').onclick=async ()=>{
-  const body={restaurant_id:st.rid,title:$('p_title').value.trim(),phone:$('p_phone').value.trim(),
-              city:$('p_city').value.trim(),address:$('p_addr').value.trim(),lat:$('p_lat').value,lon:$('p_lon').value};
-  await fetch(API+'/api/v1/merchant/profile',{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify(body)});
-  loadProfile();
+  const data=await rr.json(); if(!rr.ok){alert(data.detail||'Ошибка регистрации'); return;}
+  enterAs(data.restaurant_id, data.api_key);
 };
 
-// Upload via presigned PUT to R2
+$('phone_login_btn').onclick=async ()=>{
+  ensureApi();
+  const phone=$('login_phone').value.trim();
+  const secret=$('login_secret').value.trim();
+  if(!phone||!secret){ alert('Введите телефон и dev-секрет'); return; }
+  const rs=await fetch(API+'/api/v1/merchant/recover', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({phone, secret})});
+  const data=await rs.json();
+  if(!rs.ok){ alert(data.detail||'Не найдено'); return; }
+  enterAs(data.restaurant_id, data.api_key);
+};
+
+// Upload to R2
 async function uploadPhoto(file){
+  ensureApi();
   if(!file){ alert('Файл не выбран'); return null; }
   const ps = await fetch(API + '/api/v1/uploads/presign', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({filename:file.name, content_type:file.type||'application/octet-stream'})});
   const cfg = await ps.json(); if(!ps.ok){ alert('Не удалось получить ссылку загрузки: ' + (cfg.detail||cfg.error||ps.status)); return null; }
@@ -161,24 +174,25 @@ async function uploadPhoto(file){
   if(!put.ok){ alert('Не удалось загрузить файл'); return null; }
   return cfg.public_url;
 }
-document.getElementById('o_upload_btn').onclick = async ()=>{
-  const f = document.getElementById('o_photo_file').files[0];
+$('o_upload_btn').onclick = async ()=>{
+  const f = $('o_photo_file').files[0];
   const url = await uploadPhoto(f);
-  if(url){ document.getElementById('o_photo').value = url; alert('Фото загружено'); }
+  if(url){ $('o_photo').value = url; alert('Фото загружено'); }
 };
 
-// Offers CRUD
-document.getElementById('o_btn').onclick=async ()=>{
+// CRUD offers
+$('o_btn').onclick=async ()=>{
+  ensureApi();
   const body={restaurant_id:st.rid,title:$('o_title').value.trim(),price:parseFloat($('o_price_rub').value||'0'),
               original_price:parseFloat($('o_orig_rub').value||'0')||null,qty_total:parseInt($('o_qty').value||'0',10),
-              qty_left:parseInt($('o_qty').value||'0',10),expires_at:(function(){const v=document.getElementById('o_exp_local').value; if(!v) return null; const d=new Date(v); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().replace(/\\.\\d{3}Z$/,'Z');})(),
-              photo_url:document.getElementById('o_photo').value.trim()||null};
+              qty_left:parseInt($('o_qty').value||'0',10),expires_at:(function(){const v=$('o_exp_local').value; if(!v) return null; const d=new Date(v); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().replace(/\\.\\d{3}Z$/,'Z');})(),
+              photo_url:$('o_photo').value.trim()||null};
   await fetch(API+'/api/v1/merchant/offers',{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify(body)});
   loadOffers();
 };
 async function loadOffers(){
   const r=await fetch(API+'/api/v1/merchant/offers?restaurant_id='+encodeURIComponent(st.rid)+'&status=active',{headers:auth()});
-  const arr=await r.json(); const el=document.getElementById('offers'); el.innerHTML='';
+  const arr=await r.json(); const el=$('offers'); el.innerHTML='';
   for(const it of arr){
     const d=document.createElement('div'); d.className='card';
     const img = it.photo_url ? '<img class="photo" src="'+it.photo_url+'">' : '';
@@ -193,7 +207,6 @@ async function loadOffers(){
     d.querySelector('.clrphoto').onclick=async(ev)=>{const id=ev.target.getAttribute('data-id');await fetch(API+'/api/v1/merchant/offers/'+id,{method:'POST',headers:{'Content-Type':'application/json',...auth()},body:JSON.stringify({restaurant_id:st.rid,photo_url:null})});loadOffers();};
     d.querySelector('.edit').onclick=async(ev)=>{
       const id=ev.target.getAttribute('data-id');
-      // one-window edit dialog via prompt set
       const title=prompt('Название', it.title||'')??it.title;
       const priceStr=prompt('Цена ₽', (it.price_cents/100).toString());
       const price= priceStr==null ? (it.price_cents/100) : parseFloat(priceStr||'0');
@@ -208,5 +221,6 @@ async function loadOffers(){
     el.appendChild(d);
   }
 }
-window.addEventListener('load',()=>{$('rid').value=st.rid;$('key').value=st.key;loadProfile();initMap();});
+
+window.addEventListener('load',()=>{ initMap(); loadProfile(); });
 </script>
