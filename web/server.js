@@ -3,7 +3,6 @@ const path = require('path');
 const app = express();
 const WEB_DIR = path.join(__dirname, 'web');
 const FOODY_API = process.env.FOODY_API || '';
-
 app.get('/config.js', (req,res) => {
   res.type('application/javascript').send(`window.foodyApi=${JSON.stringify(FOODY_API)};`);
 });

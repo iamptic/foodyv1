@@ -1,4 +1,4 @@
-import os, io, csv, json, secrets, datetime as dt, base64, math
+import os, io, csv, json, secrets, datetime as dt, base64, math, uuid
 from typing import Optional, Dict, Any, List
 
 import asyncpg
@@ -10,7 +10,7 @@ import bootstrap_sql
 
 DB_URL = os.getenv("DATABASE_URL")
 
-app = FastAPI(title="Foody Backend — MVP+")
+app = FastAPI(title="Foody Backend — MVP+R2")
 
 origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
 if origins:
@@ -409,7 +409,6 @@ async def kpi(restaurant_id: str, x_foody_key: str = Header(default="")):
         rid_ok = await auth(conn, x_foody_key, restaurant_id)
         if not rid_ok:
             raise HTTPException(401, "Invalid API key or restaurant_id")
-        # simple aggregates
         reserved = await conn.fetchval("""SELECT COUNT(*) FROM foody_reservations r 
                                           JOIN foody_offers o ON o.id=r.offer_id 
                                           WHERE o.restaurant_id=$1""", restaurant_id)
@@ -421,6 +420,40 @@ async def kpi(restaurant_id: str, x_foody_key: str = Header(default="")):
                                          WHERE o.restaurant_id=$1 AND r.status='redeemed'""", restaurant_id)
         rate = (redeemed / reserved) if reserved else 0.0
         return {"reserved": reserved, "redeemed": redeemed, "redemption_rate": round(rate,2), "revenue_cents": int(revenue or 0), "saved_cents": 0}
+
+# ---- R2 presigned uploads ----
+import boto3
+R2_ENDPOINT = os.getenv("R2_ENDPOINT","").rstrip("/")
+R2_BUCKET = os.getenv("R2_BUCKET","")
+R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID","")
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY","")
+
+def _r2_client():
+    if not (R2_ENDPOINT and R2_BUCKET and R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY):
+        raise HTTPException(400, "R2 is not configured")
+    return boto3.client("s3", endpoint_url=R2_ENDPOINT, aws_access_key_id=R2_ACCESS_KEY_ID,
+                        aws_secret_access_key=R2_SECRET_ACCESS_KEY, region_name="auto")
+
+@app.post("/api/v1/uploads/presign")
+async def presign_upload(params: Dict[str, Any] = Body(...)):
+    filename = (params.get("filename") or "upload.bin")
+    content_type = (params.get("content_type") or "application/octet-stream")
+    ext = ""
+    if "." in filename:
+        ext = filename.rsplit(".",1)[-1].lower()
+        if len(ext) > 8: ext = ""
+    key = f"offers/{uuid.uuid4().hex}{('.'+ext) if ext else ''}"
+    try:
+        s3 = _r2_client()
+        put_url = s3.generate_presigned_url(
+            "put_object",
+            Params={"Bucket": R2_BUCKET, "Key": key, "ContentType": content_type},
+            ExpiresIn=3600
+        )
+        public_url = f"{R2_ENDPOINT}/{R2_BUCKET}/{key}"
+        return {"put_url": put_url, "public_url": public_url, "key": key}
+    except Exception as e:
+        raise HTTPException(500, f"Cannot presign: {e}")
 
 # ---- Seed ----
 TEST_RID = "RID_TEST"

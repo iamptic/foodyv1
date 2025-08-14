@@ -1,5 +1,20 @@
 <!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Foody — ЛК (обновлено)</title><script src="/config.js"></script>
+<title>Foody — ЛК (обновлено)</title><script src="/config.js">
+// --- Upload via presigned PUT to R2 ---
+async function uploadPhoto(file){
+  if(!file){ alert('Файл не выбран'); return null; }
+  const ps = await fetch(API + '/api/v1/uploads/presign', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({filename:file.name, content_type:file.type||'application/octet-stream'})});
+  const cfg = await ps.json(); if(!ps.ok){ alert('Не удалось получить ссылку загрузки: ' + (cfg.detail||cfg.error||ps.status)); return null; }
+  const put = await fetch(cfg.put_url, {method:'PUT', headers:{'Content-Type': file.type||'application/octet-stream'}, body:file});
+  if(!put.ok){ alert('Не удалось загрузить файл'); return null; }
+  return cfg.public_url;
+}
+document.getElementById('o_upload_btn').onclick = async ()=>{
+  const f = document.getElementById('o_photo_file').files[0];
+  const url = await uploadPhoto(f);
+  if(url){ document.getElementById('o_photo').value = url; alert('Фото загружено'); }
+};
+</script>
 <style>
  body{font-family:Inter,system-ui,Arial,sans-serif;margin:0;background:#0b0c10;color:#eee}
  header{padding:12px 16px;background:#111;border-bottom:1px solid #222;display:flex;gap:10px;align-items:center}
@@ -63,8 +78,7 @@
       <div><label>Старая цена ₽</label><input id="o_orig_rub" type="number" step="0.01" placeholder="349.00"></div>
       <div><label>Количество *</label><input id="o_qty" type="number" step="1" placeholder="5"></div>
       <div><label>Истекает (местное время)</label><input id="o_exp_local" type="datetime-local"></div>
-      <div><label>Фото URL</label><input id="o_photo" placeholder="https://..."></div>
-      <div style="align-self:end"><button id="o_btn">Создать</button></div>
+      <div><label>Фото URL</label><input id="o_photo" placeholder="https://..."><div style="margin-top:6px"><input type="file" id="o_photo_file" accept="image/*"> <button id="o_upload_btn" type="button">Загрузить фото →</button></div></div><div style="align-self:end"><button id="o_btn">Создать</button></div>
     </div>
   </div>
   <div class="card" style="margin-top:14px">
@@ -136,4 +150,19 @@ async function loadOffers(){
   }
 }
 window.addEventListener('load',()=>{$('rid').value=st.rid;$('key').value=st.key;loadProfile();});
+
+// --- Upload via presigned PUT to R2 ---
+async function uploadPhoto(file){
+  if(!file){ alert('Файл не выбран'); return null; }
+  const ps = await fetch(API + '/api/v1/uploads/presign', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({filename:file.name, content_type:file.type||'application/octet-stream'})});
+  const cfg = await ps.json(); if(!ps.ok){ alert('Не удалось получить ссылку загрузки: ' + (cfg.detail||cfg.error||ps.status)); return null; }
+  const put = await fetch(cfg.put_url, {method:'PUT', headers:{'Content-Type': file.type||'application/octet-stream'}, body:file});
+  if(!put.ok){ alert('Не удалось загрузить файл'); return null; }
+  return cfg.public_url;
+}
+document.getElementById('o_upload_btn').onclick = async ()=>{
+  const f = document.getElementById('o_photo_file').files[0];
+  const url = await uploadPhoto(f);
+  if(url){ document.getElementById('o_photo').value = url; alert('Фото загружено'); }
+};
 </script>
