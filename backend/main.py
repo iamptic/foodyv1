@@ -537,6 +537,49 @@ async def merchant_recover(body: Dict[str, Any] = Body(...)):
 
 
 @app.post('/internal/notify')
+
+# === DEV-ONLY merchant recovery by phone (guarded by RECOVERY_SECRET) ===
+from fastapi import Body, HTTPException
+from typing import Any, Dict
+import os as _os
+import datetime as _dt
+
+@app.post("/api/v1/merchant/recover")
+async def merchant_recover(body: Dict[str, Any] = Body(...)):
+    secret = _os.getenv("RECOVERY_SECRET", "")
+    if not secret:
+        raise HTTPException(503, "Recovery is not enabled")
+    if (body.get("secret") or "") != secret:
+        raise HTTPException(403, "Forbidden")
+    phone = (body.get("phone") or "").strip()
+    if not phone:
+        raise HTTPException(422, "phone required")
+    p = await pool()
+    async with p.acquire() as conn:
+        r = await conn.fetchrow("SELECT id, api_key, title FROM foody_restaurants WHERE phone=$1 ORDER BY created_at DESC LIMIT 1", phone)
+        if not r:
+            raise HTTPException(404, "Not found")
+        return {"restaurant_id": r["id"], "api_key": r["api_key"], "title": r["title"]}
+
+# ---- Reservations + QR ----
+def make_qr_png_b64(text: str) -> str:
+    # Minimal inline QR using segno if available, else a tiny placeholder
+    try:
+        import base64, io, segno
+        buf = io.BytesIO()
+        segno.make(text, micro=False).save(buf, kind="png", scale=5)
+        return base64.b64encode(buf.getvalue()).decode("ascii")
+    except Exception:
+        # Fallback: return a tiny 1x1 png
+        import base64
+        return "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+
+@app.get("/api/v1/reservations/qr")
+async def reservation_qr(code: str):
+    if not code:
+        raise HTTPException(422, "code required")
+    return {"qrcode_png_base64": make_qr_png_b64(code)}
+
 async def internal_notify(body: Dict[str, Any] = Body(...)):
     # Placeholder: accept notifications from backend to bot or elsewhere.
     # For MVP this is a no-op, just logs input and returns ok.
