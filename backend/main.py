@@ -371,19 +371,21 @@ def make_qr_png_b64(text: str) -> str:
 async def create_reservation(body: Dict[str, Any] = Body(...)):
     offer_id = (body.get("offer_id") or "").strip()
     if not offer_id: raise HTTPException(422, "offer_id required")
+    qty = int(body.get("qty") or 1)
+    if qty < 1: raise HTTPException(422, "qty must be >= 1")
     p = await pool()
     async with p.acquire() as conn:
         off = await conn.fetchrow("SELECT id, qty_left FROM foody_offers WHERE id=$1 AND (archived_at IS NULL) AND (expires_at IS NULL OR expires_at>NOW())", offer_id)
         if not off: raise HTTPException(404, "Offer not found or inactive")
-        if off["qty_left"] is not None and off["qty_left"] <= 0: raise HTTPException(409, "No items left")
+        if off["qty_left"] is not None and off["qty_left"] < qty: raise HTTPException(409, "Not enough items left")
         code = rescode()
         rid = resid()
         async with conn.transaction():
-            await conn.execute("INSERT INTO foody_reservations(id, offer_id, code, status) VALUES($1,$2,$3,'reserved')", rid, offer_id, code)
+            await conn.execute("INSERT INTO foody_reservations(id, offer_id, code, status, qty) VALUES($1,$2,$3,'reserved',$4)", rid, offer_id, code, qty)
             if off["qty_left"] is not None:
-                await conn.execute("UPDATE foody_offers SET qty_left=qty_left-1 WHERE id=$1", offer_id)
-        qr_b64 = make_qr_png_b64(code)
-        return {"id": rid, "code": code, "qrcode_png_base64": qr_b64}
+                await conn.execute("UPDATE foody_offers SET qty_left=qty_left-$1 WHERE id=$2", qty, offer_id)
+    qr_b64 = make_qr_png_b64(code)
+    return {"id": rid, "code": code, "qty": qty, "qrcode_png_base64": qr_b64}
 
 @app.post("/api/v1/reservations/redeem")
 async def redeem_reservation(body: Dict[str, Any] = Body(...), x_foody_key: str = Header(default="")):
@@ -400,6 +402,25 @@ async def redeem_reservation(body: Dict[str, Any] = Body(...), x_foody_key: str 
         if res["status"] == "redeemed": return {"ok": True, "status": "already_redeemed"}
         await conn.execute("UPDATE foody_reservations SET status='redeemed', redeemed_at=NOW() WHERE id=$1", res["id"])
         return {"ok": True, "status": "redeemed"}
+
+@app.post("/api/v1/reservations/cancel")
+async def cancel_reservation(body: Dict[str, Any] = Body(...)):
+    code = (body.get("code") or "").strip()
+    if not code: raise HTTPException(422, "code required")
+    p = await pool()
+    async with p.acquire() as conn:
+        res = await conn.fetchrow("""SELECT r.*, o.expires_at, o.id as oid FROM foody_reservations r
+                                     JOIN foody_offers o ON o.id=r.offer_id WHERE r.code=$1""", code)
+        if not res: raise HTTPException(404, "Reservation not found")
+        if res["status"] != "reserved":
+            return {"ok": False, "status": res["status"]}
+        if res["expires_at"] and res["expires_at"] < dt.datetime.utcnow().replace(tzinfo=dt.timezone.utc):
+            return {"ok": False, "status": "expired"}
+        async with conn.transaction():
+            await conn.execute("UPDATE foody_reservations SET status='canceled' WHERE id=$1", res["id"])
+            await conn.execute("UPDATE foody_offers SET qty_left=qty_left+$1 WHERE id=$2", res["qty"], res["oid"])
+        return {"ok": True, "status": "canceled"}
+
 
 # ---- KPI stub ----
 @app.get("/api/v1/merchant/kpi")
